@@ -155,6 +155,23 @@ class App(tk.Tk):
                   font=("Arial", 10), width=14,
                   command=self._test_lamp).grid(row=0, column=2, padx=6)
 
+        # כפתור סימולציה
+        sim_frame = ttk.LabelFrame(self, text="סימולציה — בדיקה ללא אזעקה אמיתית")
+        sim_frame.pack(fill="x", padx=12, pady=4)
+
+        sim_alerts = [
+            ("1",  "🔴 רקטות"),
+            ("3",  "🔴 כלי טיס"),
+            ("4",  "🟢 מחבלים"),
+            ("5",  "🟣 רעידה"),
+            ("7",  "🟡 כימי"),
+            ("101","🔵 תרגיל"),
+        ]
+        for i, (cat, name) in enumerate(sim_alerts):
+            tk.Button(sim_frame, text=name, font=("Arial", 9), width=10,
+                      command=lambda c=cat: self._simulate(c)
+                      ).grid(row=0, column=i, padx=4, pady=4)
+
         # סטטוס
         status_frame = ttk.LabelFrame(self, text="סטטוס")
         status_frame.pack(fill="x", padx=12, pady=6)
@@ -230,6 +247,27 @@ class App(tk.Tk):
                 self._log("✅ נורה מגיבה בהצלחה!")
             except Exception as e:
                 self._log(f"❌ שגיאה: {e}")
+        threading.Thread(target=_do, daemon=True).start()
+
+    def _simulate(self, cat):
+        ip = self.ip_var.get().strip()
+        if not ip:
+            messagebox.showwarning("חסר IP", "נא למלא את ה-IP של הנורה")
+            return
+        color = ALERT_COLORS.get(cat, {"r": 255, "g": 0, "b": 0, "name": "🔴 התרעה"})
+        self._log(f"🧪 סימולציה: {color['name']}")
+        self._set_status(f"סימולציה: {color['name']}", "orange", "🟠")
+        def _do():
+            try:
+                run_async(flash_and_set(ip, color["r"], color["g"], color["b"]))
+                time.sleep(5)
+                run_async(set_color(ip, NORMAL["r"], NORMAL["g"], NORMAL["b"], NORMAL["brightness"]))
+                self._log("✅ סימולציה הסתיימה — חזרה לצבע רגיל")
+                self._set_status("מאזין להתרעות..." if self.running else "לא פעיל",
+                                 "green" if self.running else "gray",
+                                 "🟢" if self.running else "⚫")
+            except Exception as e:
+                self._log(f"❌ שגיאה בסימולציה: {e}")
         threading.Thread(target=_do, daemon=True).start()
 
     def _monitor_loop(self):
