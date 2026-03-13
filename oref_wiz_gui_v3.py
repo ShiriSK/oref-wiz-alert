@@ -116,6 +116,13 @@ CITIES = sorted([
     "שוהם", "שלומי", "שפרעם", "תל אביב - דרום",
     "תל אביב - מזרח", "תל אביב - מרכז העיר",
     "תל אביב - צפון", "תל מונד", "תמרת",
+    "שתולה", "ערב אל עראמשה", "מתת", "סאסא",
+    "אבו עמאר (שבט)", "זרזיר", "חורה", "חורפיש",
+    "כפר חיטים", "כפר מכר", "כפר ריינה",
+    "לקיה", "מעיליא", "ניר יצחק",
+    "ערערה", "ערערה-בנגב", "פקיעין",
+    "קציר-חריש", "ראמה", "שאר ישוב",
+    "שגב-שלום", "הר אדר", "גבעות בר",
 ])
 
 # ─── WiZ ───
@@ -197,7 +204,11 @@ class App(tk.Tk):
         self.city_combo["values"] = CITIES
         self.city_combo.grid(row=1, column=1, columnspan=2, sticky="w", padx=4)
         self.city_combo.set(self.config_data["my_city"] or "בחרי עיר...")
-        tk.Label(frame, text="(בחרי מהרשימה או הקלידי)",
+        # סגירת תפריט בלחיצת Enter או Tab
+        self.city_combo.bind("<Return>", lambda e: self.city_combo.event_generate("<Escape>"))
+        self.city_combo.bind("<Tab>", lambda e: self.city_combo.event_generate("<Escape>"))
+        self.city_combo.bind("<<ComboboxSelected>>", lambda e: self.focus())
+        tk.Label(frame, text="(בחרי מהרשימה או הקלידי ידנית)",
                  fg="gray", font=("Arial", 8)).grid(row=1, column=3, sticky="w")
 
         # ─── סימולציה ───
@@ -205,12 +216,13 @@ class App(tk.Tk):
         sim_frame.pack(fill="x", padx=12, pady=4)
 
         sim_alerts = [
-            ("1",   "🔴 רקטות"),
-            ("4",   "🟢 מחבלים"),
-            ("101", "🔵 תרגיל"),
+            ("1",   "🔴 רקטות",  "#e74c3c", "white"),
+            ("4",   "🟢 מחבלים", "#2ecc71", "white"),
+            ("101", "🔵 תרגיל",  "#3498db", "white"),
         ]
-        for i, (cat, name) in enumerate(sim_alerts):
+        for i, (cat, name, bg, fg) in enumerate(sim_alerts):
             tk.Button(sim_frame, text=name, font=("Arial", 10, "bold"), width=14,
+                      bg=bg, fg=fg,
                       command=lambda c=cat: self._simulate(c)
                       ).grid(row=0, column=i, padx=8, pady=6)
 
@@ -395,24 +407,44 @@ class App(tk.Tk):
         threading.Thread(target=_do, daemon=True).start()
 
     def _simulate(self, cat):
-        ip = self.ip_var.get().strip()
-        if not ip:
-            messagebox.showwarning("חסר IP", "נא למלא את ה-IP של הנורה")
-            return
         color = ALERT_COLORS.get(cat, {"r": 255, "g": 0, "b": 0, "name": "🔴 התרעה"})
         self._log(f"🧪 סימולציה: {color['name']}")
         self._set_status(f"סימולציה: {color['name']}", "orange", "🟠")
+
+        # צבע רקע של החלון לפי סוג ההתרעה
+        hex_color = "#{:02x}{:02x}{:02x}".format(
+            min(color["r"], 200), min(color["g"], 200), min(color["b"], 200))
+        self._flash_window(hex_color)
+
+        ip = self.ip_var.get().strip()
+        if ip:
+            def _do():
+                try:
+                    run_async(flash_and_set(ip, color["r"], color["g"], color["b"]))
+                    time.sleep(5)
+                    run_async(set_color(ip, NORMAL["r"], NORMAL["g"], NORMAL["b"], NORMAL["brightness"]))
+                    self._log("✅ סימולציה הסתיימה")
+                    self._set_status("מאזין להתרעות..." if self.running else "לא פעיל",
+                                     "green" if self.running else "gray",
+                                     "🟢" if self.running else "⚫")
+                except Exception as e:
+                    self._log(f"❌ שגיאה בנורה: {e}")
+            threading.Thread(target=_do, daemon=True).start()
+        else:
+            self._log("💡 אין נורה מוגדרת — מציג בממשק בלבד")
+            self.after(5000, lambda: [
+                self._set_status("לא פעיל", "gray", "⚫"),
+                self.configure(bg="SystemButtonFace")
+            ])
+
+    def _flash_window(self, color):
+        """הבהוב חלון הממשק בצבע ההתרעה"""
         def _do():
-            try:
-                run_async(flash_and_set(ip, color["r"], color["g"], color["b"]))
-                time.sleep(5)
-                run_async(set_color(ip, NORMAL["r"], NORMAL["g"], NORMAL["b"], NORMAL["brightness"]))
-                self._log("✅ סימולציה הסתיימה")
-                self._set_status("מאזין להתרעות..." if self.running else "לא פעיל",
-                                 "green" if self.running else "gray",
-                                 "🟢" if self.running else "⚫")
-            except Exception as e:
-                self._log(f"❌ שגיאה: {e}")
+            for i in range(6):
+                bg = color if i % 2 == 0 else "SystemButtonFace"
+                self.configure(bg=bg)
+                time.sleep(0.35)
+            self.configure(bg=color)
         threading.Thread(target=_do, daemon=True).start()
 
     def _monitor_loop(self):
@@ -455,10 +487,14 @@ class App(tk.Tk):
                         cities_str = ", ".join(alert.get("data", []))
                         self._log(f"🚨 {color['name']} | {cities_str}")
                         self._set_status(f"{color['name']}", "red", "🔴")
-                        try:
-                            run_async(flash_and_set(ip, color["r"], color["g"], color["b"]))
-                        except Exception as e:
-                            self._log(f"❌ נורה: {e}")
+                        hex_color = "#{:02x}{:02x}{:02x}".format(
+                            min(color["r"], 200), min(color["g"], 200), min(color["b"], 200))
+                        self._flash_window(hex_color)
+                        if ip:
+                            try:
+                                run_async(flash_and_set(ip, color["r"], color["g"], color["b"]))
+                            except Exception as e:
+                                self._log(f"❌ נורה: {e}")
                         alert_active = True
                         last_alert_id = alert_id
                         alert_end_time = time.time() + self.config_data["alert_duration_sec"]
