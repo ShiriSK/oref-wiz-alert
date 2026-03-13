@@ -58,6 +58,66 @@ OREF_HEADERS = {
     "User-Agent": "Mozilla/5.0",
 }
 
+# ─── רשימת ערים קבועה ───
+CITIES = sorted([
+    "אבו גוש", "אבו סנאן", "אבו קורינאת (שבט)", "אום אל-פחם", "אום אל-קוטוף",
+    "אופקים", "אור יהודה", "אור עקיבא", "אורנית", "אחיהוד", "אחיסמך", "אילת",
+    "אכסאל", "אל-בטוף", "אל-עזאזמה", "אלון שבות", "אלוני אבא", "אלעד",
+    "אלקנה", "אמירים", "אמנון", "אעבלין", "אפרת", "אקרה", "אראבה",
+    "אריאל", "אשדוד", "אשקלון", "באקה אל-גרביה", "באר יעקב", "באר שבע",
+    "באר שבע - דרום", "באר שבע - מזרח", "באר שבע - מערב", "באר שבע - צפון",
+    "בית אל", "בית דגן", "בית ג'ן", "בית הגדי", "בית חנן", "בית חנניה",
+    "בית יצחק-שער חפר", "בית לחם הגלילית", "בית מאיר", "בית נקופה",
+    "בית עריף", "בית שאן", "בית שמש", "בית שמש - גבעת שרת",
+    "בית שמש - נווה אברהם", "בית שמש - רמות", "בני ברק", "בני עי\"ש",
+    "בנימינה-גבעת עדה", "בסמ\"ה", "בסמת טבעון", "ביר אל-מכסור", "בקה-ג'ת",
+    "בר יוחאי", "ברקן", "ג'דיידה-מכר", "ג'לג'וליה", "ג'סר א-זרקא",
+    "ג'ת", "גבעת אבני", "גבעת ברנר", "גבעת זאב", "גבעת שמואל",
+    "גבעתיים", "גדרה", "גולן", "גזר", "גילת", "גן יבנה", "גני תקווה",
+    "גנות", "גפן", "גרופית", "דאלית אל-כרמל", "דבורייה", "דגניה א",
+    "דגניה ב", "דימונה", "דליה", "דלתון", "דמיידה", "דקל", "דריג'את",
+    "הוד השרון", "הוד השרון - כפר המכבי", "הוד השרון - מגשימים",
+    "הוד השרון - נווה ימין", "הוד השרון - צהלה", "הרצליה", "הרצליה - מזרח",
+    "הרצליה - מערב", "זבארגה (שבט)", "זיקים", "זכרון יעקב", "זמר",
+    "חדרה", "חדרה - מזרח", "חדרה - מערב", "חוסנייה", "חולון", "חולית",
+    "חיפה - כרמל ועיר תחתית", "חיפה - מפרץ", "חיפה - נווה שאנן ורמות",
+    "חיפה - קריות", "חיפה - שמן", "חמאם", "חצור הגלילית", "חצרים",
+    "טבריה", "טורעאן", "טייבה", "טירה", "טירת כרמל", "טל שחר",
+    "טללים", "יבנה", "יד מרדכי", "יהוד-מונוסון", "יודפת", "יוקנעם עילית",
+    "יזרעאל", "יכיני", "ינוח-ג'ת", "ירוחם", "ירושלים", "ירושלים - דרום",
+    "ירושלים - מזרח", "ירושלים - מערב", "ירושלים - צפון", "כאבול",
+    "כאוכב אבו אל-היג'א", "כברי", "כוכב יאיר-צור יגאל", "כוכב מיכאל",
+    "כיסופים", "כישור", "כפר ברא", "כפר ג'ת", "כפר יאסיף", "כפר יונה",
+    "כפר כנא", "כפר מנדא", "כפר מצר", "כפר נהר הירדן", "כפר סבא",
+    "כפר סמיע", "כפר עבודה", "כפר קאסם", "כפר קרע", "כפר שמריהו",
+    "כרמיאל", "כרמים", "לוד", "לכיש", "מבוא חורון", "מבוא מודיעים",
+    "מגאר", "מגדל העמק", "מגדל תפן", "מודיעין-מכבים-רעות", "מועאוויה",
+    "מזכרת בתיה", "מחניים", "מטולה", "מיתר", "מכמנים", "מעיין ברוך",
+    "מעלה אדומים", "מעלה גלבוע", "מעלה החמישה", "מעלה עירון",
+    "מעלות-תרשיחא", "מצפה אביב", "מצפה אילן", "מצפה רמון",
+    "מרכז שפירא", "משגב עם", "משהד", "נאות הכיכר", "נהריה",
+    "נוף הגליל", "נועם", "נורית", "נחל עוז", "נחם", "ניצן",
+    "ניצן ב", "ניר בנים", "ניר גלים", "ניר עם", "נס ציונה",
+    "נצרת", "נצרת עילית", "נשר", "נתיבות", "נתניה",
+    "נתניה - מזרח", "נתניה - מערב", "נתניה - צפון",
+    "סאג'ור", "סביון", "סח'נין", "סמר", "ספיר",
+    "עומר", "עוספיא", "עילבון", "עין קינייא", "עכו",
+    "עמקה", "עפולה", "עראבה", "ערד", "פדואל",
+    "פוריידיס", "פרדס חנה-כרכור", "פתח תקווה",
+    "פתח תקווה - דרום", "פתח תקווה - מזרח", "פתח תקווה - מערב",
+    "צפת", "קדומים", "קדימה-צורן", "קלנסווה", "קציר",
+    "קרית אונו", "קרית אתא", "קרית ביאליק", "קרית גת",
+    "קרית טבעון", "קרית ים", "קרית מלאכי", "קרית מוצקין",
+    "קרית שמונה", "ראש העין", "ראש פינה", "ראשון לציון",
+    "ראשון לציון - מזרח", "ראשון לציון - מערב",
+    "רהט", "רחובות", "רמות השבים", "רמלה", "רמת גן",
+    "רמת גן - מזרח", "רמת גן - מערב",
+    "רמת השרון", "רמת ישי", "רעננה", "שדרות",
+    "שוהם", "שלומי", "שפרעם", "תל אביב - דרום",
+    "תל אביב - מזרח", "תל אביב - מרכז העיר",
+    "תל אביב - צפון", "תל מונד", "תמרת",
+])
+
 # ─── WiZ ───
 def run_async(coro):
     loop = asyncio.new_event_loop()
@@ -106,11 +166,8 @@ class App(tk.Tk):
         self.resizable(False, False)
         self.config_data = load_config()
         self.running = False
-        self.cities_list = []
         self._build_ui()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
-        # טעינת ערים ברקע
-        threading.Thread(target=self._load_cities, daemon=True).start()
 
     def _build_ui(self):
         pad = {"padx": 12, "pady": 6}
@@ -132,34 +189,45 @@ class App(tk.Tk):
         tk.Label(frame, text="(או מצא ב: WiZ App → Settings → Device IP)",
                  fg="gray", font=("Arial", 8)).grid(row=0, column=3, sticky="w")
 
-        # עיר — Combobox
+        # עיר — Combobox עם רשימה קבועה
         tk.Label(frame, text="העיר שלי:").grid(row=1, column=0, sticky="e", **pad)
         self.city_var = tk.StringVar(value=self.config_data["my_city"])
         self.city_combo = ttk.Combobox(frame, textvariable=self.city_var,
                                         width=25, state="normal")
+        self.city_combo["values"] = CITIES
         self.city_combo.grid(row=1, column=1, columnspan=2, sticky="w", padx=4)
-        self.city_combo.set(self.config_data["my_city"] or "⏳ טוען ערים...")
+        self.city_combo.set(self.config_data["my_city"] or "בחרי עיר...")
         tk.Label(frame, text="(בחרי מהרשימה או הקלידי)",
                  fg="gray", font=("Arial", 8)).grid(row=1, column=3, sticky="w")
 
-        # ─── התרעות אופציונליות ───
-        opt_frame = ttk.LabelFrame(self, text="התרעות נוספות (כבויות כברירת מחדל)")
-        opt_frame.pack(fill="x", padx=12, pady=4)
+        # ─── סימולציה ───
+        sim_frame = ttk.LabelFrame(self, text="סימולציה — בדיקה ללא אזעקה אמיתית")
+        sim_frame.pack(fill="x", padx=12, pady=4)
 
-        self.optional_vars = {}
-        optional_alerts = [
-            ("5",  "🟣 רעידת אדמה"),
-            ("8",  "🔵 צונאמי"),
-            ("7",  "🟡 אירוע כימי"),
-            ("6",  "🟢 חומרים רדיואקטיביים"),
+        sim_alerts = [
+            ("1",   "🔴 רקטות"),
+            ("4",   "🟢 מחבלים"),
+            ("101", "🔵 תרגיל"),
         ]
-        for i, (cat, name) in enumerate(optional_alerts):
-            var = tk.BooleanVar(value=False)
-            self.optional_vars[cat] = var
-            tk.Checkbutton(opt_frame, text=name, variable=var,
-                           font=("Arial", 9)).grid(row=0, column=i, padx=8, pady=4)
+        for i, (cat, name) in enumerate(sim_alerts):
+            tk.Button(sim_frame, text=name, font=("Arial", 10, "bold"), width=14,
+                      command=lambda c=cat: self._simulate(c)
+                      ).grid(row=0, column=i, padx=8, pady=6)
 
-        # ─── כפתורים ───
+        self.extra_sim_visible = False
+        self.extra_sim_btn = tk.Button(sim_frame, text="+ עוד",
+                                       font=("Arial", 8), fg="gray",
+                                       relief="flat", command=self._toggle_extra_sim)
+        self.extra_sim_btn.grid(row=0, column=3, padx=4)
+
+        self.extra_sim_frame = tk.Frame(sim_frame)
+        extra_alerts = [("3", "🔴 כלי טיס"), ("5", "🟣 רעידה"), ("7", "🟡 כימי")]
+        for i, (cat, name) in enumerate(extra_alerts):
+            tk.Button(self.extra_sim_frame, text=name, font=("Arial", 9), width=12,
+                      command=lambda c=cat: self._simulate(c)
+                      ).grid(row=0, column=i, padx=4, pady=4)
+
+        # ─── כפתורים ראשיים ───
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=8)
 
@@ -177,37 +245,27 @@ class App(tk.Tk):
                   font=("Arial", 10), width=14,
                   command=self._test_lamp).grid(row=0, column=2, padx=6)
 
-        # ─── סימולציה ───
-        sim_frame = ttk.LabelFrame(self, text="סימולציה — בדיקה ללא אזעקה אמיתית")
-        sim_frame.pack(fill="x", padx=12, pady=4)
+        # ─── הגדרות מתקדמות (מוסתרות) ───
+        self.adv_visible = False
+        adv_toggle = tk.Button(self, text="⚙️ הגדרות מתקדמות ▼",
+                               font=("Arial", 8), fg="gray", relief="flat",
+                               command=self._toggle_advanced)
+        adv_toggle.pack(pady=2)
+        self.adv_toggle_btn = adv_toggle
 
-        sim_alerts = [
-            ("1",   "🔴 רקטות"),
-            ("4",   "🟢 מחבלים"),
-            ("101", "🔵 תרגיל"),
+        self.adv_frame = ttk.LabelFrame(self, text="התרעות נוספות (כבויות כברירת מחדל)")
+        self.optional_vars = {}
+        optional_alerts = [
+            ("5",  "🟣 רעידת אדמה"),
+            ("8",  "🔵 צונאמי"),
+            ("7",  "🟡 אירוע כימי"),
+            ("6",  "🟢 חומרים רדיואקטיביים"),
         ]
-        for i, (cat, name) in enumerate(sim_alerts):
-            tk.Button(sim_frame, text=name, font=("Arial", 10, "bold"), width=14,
-                      command=lambda c=cat: self._simulate(c)
-                      ).grid(row=0, column=i, padx=8, pady=6)
-
-        # אפשרויות נוספות — מוסתרות כברירת מחדל
-        self.extra_sim_visible = False
-        self.extra_sim_btn = tk.Button(sim_frame, text="+ עוד אפשרויות",
-                                       font=("Arial", 8), fg="gray",
-                                       relief="flat", command=self._toggle_extra_sim)
-        self.extra_sim_btn.grid(row=0, column=3, padx=4)
-
-        self.extra_sim_frame = tk.Frame(sim_frame)
-        extra_alerts = [
-            ("3",  "🔴 כלי טיס"),
-            ("5",  "🟣 רעידה"),
-            ("7",  "🟡 כימי"),
-        ]
-        for i, (cat, name) in enumerate(extra_alerts):
-            tk.Button(self.extra_sim_frame, text=name, font=("Arial", 9), width=12,
-                      command=lambda c=cat: self._simulate(c)
-                      ).grid(row=0, column=i, padx=4, pady=4)
+        for i, (cat, name) in enumerate(optional_alerts):
+            var = tk.BooleanVar(value=False)
+            self.optional_vars[cat] = var
+            tk.Checkbutton(self.adv_frame, text=name, variable=var,
+                           font=("Arial", 9)).grid(row=0, column=i, padx=8, pady=4)
 
         # ─── סטטוס ───
         status_frame = ttk.LabelFrame(self, text="סטטוס")
@@ -231,23 +289,15 @@ class App(tk.Tk):
         tk.Label(self, text="Developed by Shiri Schnapp Kashi | shiri@designservice.co.il",
                  fg="gray", font=("Arial", 7)).pack(pady=2)
 
-    # ─── טעינת ערים ───
-    def _load_cities(self):
-        try:
-            resp = requests.get(CITIES_URL, headers=OREF_HEADERS, timeout=8)
-            if resp.status_code == 200:
-                data = resp.json()
-                cities = sorted([c.get("label", "") or c.get("value", "") for c in data if c.get("label")])
-                self.cities_list = cities
-                self.city_combo["values"] = cities
-                if not self.config_data["my_city"]:
-                    self.city_combo.set("בחרי עיר...")
-                else:
-                    self.city_combo.set(self.config_data["my_city"])
-                self._log(f"✅ נטענו {len(cities)} ערים")
-        except Exception as e:
-            self._log(f"⚠️ לא ניתן לטעון ערים: {e}")
-            self.city_combo.set(self.config_data["my_city"] or "")
+    # ─── הגדרות מתקדמות ───
+    def _toggle_advanced(self):
+        if self.adv_visible:
+            self.adv_frame.pack_forget()
+            self.adv_toggle_btn.config(text="⚙️ הגדרות מתקדמות ▼")
+        else:
+            self.adv_frame.pack(fill="x", padx=12, pady=4)
+            self.adv_toggle_btn.config(text="⚙️ הגדרות מתקדמות ▲")
+        self.adv_visible = not self.adv_visible
 
     # ─── סריקת רשת ───
     def _scan_network(self):
