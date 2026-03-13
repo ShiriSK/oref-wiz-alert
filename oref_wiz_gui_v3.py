@@ -39,7 +39,7 @@ def save_config(cfg):
 ALERT_COLORS = {
     "1":   {"r": 255, "g": 0,   "b": 0,   "name": "🔴 ירי רקטות",          "default_on": True},
     "2":   {"r": 255, "g": 0,   "b": 0,   "name": "🔴 ירי לא מזוהה",       "default_on": True},
-    "3":   {"r": 255, "g": 50,  "b": 0,   "name": "🔴 חדירת כלי טיס",      "default_on": True},
+    "3":   {"r": 255, "g": 140, "b": 0,   "name": "🟠 חדירת כלי טיס",      "default_on": True},
     "4":   {"r": 0,   "g": 220, "b": 0,   "name": "🟢 חדירת מחבלים",       "default_on": True},
     "13":  {"r": 255, "g": 0,   "b": 0,   "name": "🔴 פיגוע",               "default_on": True},
     "101": {"r": 0,   "g": 200, "b": 255, "name": "🔵 תרגיל",               "default_on": True},
