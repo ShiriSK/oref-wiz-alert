@@ -182,6 +182,13 @@ class App(tk.Tk):
         tk.Label(self, text="🚨 התרעות פיקוד העורף → נורת WiZ",
                  font=("Arial", 14, "bold")).pack(**pad)
 
+        # באנר מצב דמו — מוסתר כברירת מחדל
+        self.demo_banner = tk.Label(self,
+            text="⚠️  מצב דמו — אין נורה מחוברת  ⚠️\nזה לא אמיתי — לבדיקה בלבד!",
+            font=("Arial", 13, "bold"), fg="white", bg="#e67e22",
+            pady=8)
+        # יוצג רק כשאין IP
+
         # ─── הגדרות ───
         frame = ttk.LabelFrame(self, text="הגדרות")
         frame.pack(fill="x", padx=12, pady=6)
@@ -193,7 +200,7 @@ class App(tk.Tk):
         self.scan_btn = tk.Button(frame, text="🔍 סרוק רשת",
                                   font=("Arial", 9), command=self._scan_network)
         self.scan_btn.grid(row=0, column=2, padx=4)
-        tk.Label(frame, text="(או מצא ב: WiZ App → Settings → Device IP)",
+        tk.Label(frame, text="(לדוגמה: 192.168.1.45 — מצא ב: WiZ App ← Settings ← Device IP)",
                  fg="gray", font=("Arial", 8)).grid(row=0, column=3, sticky="w")
 
         # עיר — Combobox עם רשימה קבועה
@@ -356,6 +363,9 @@ class App(tk.Tk):
         self.extra_sim_visible = not self.extra_sim_visible
 
     def _log(self, msg):
+        # התעלם משגיאות BOM טכניות
+        if "UTF-8 BOM" in msg or "utf-8-sig" in msg:
+            return
         ts = time.strftime("%H:%M:%S")
         line = f"[{ts}] {msg}\n"
         self.log_box.config(state="normal")
@@ -368,19 +378,31 @@ class App(tk.Tk):
         self.status_dot.config(text=dot, fg=color)
 
     def _start(self):
-        ip = self.ip_var.get().strip()
         city = self.city_var.get().strip()
-        if not ip or not city or city in ("בחרי עיר...", "⏳ טוען ערים..."):
-            messagebox.showwarning("חסר מידע", "נא למלא IP של הנורה ולבחור עיר")
+        ip = self.ip_var.get().strip()
+        if not city or city in ("בחרי עיר...", "⏳ טוען ערים..."):
+            messagebox.showwarning("חסר מידע", "נא לבחור עיר")
             return
+        if not ip:
+            if not messagebox.askyesno("ללא נורה",
+                "לא הוזן IP של נורה.\nהמעקב יעבוד — ביומן ובהבהוב החלון בלבד.\nלהמשיך?"):
+                return
         self.config_data["wiz_ip"] = ip
         self.config_data["my_city"] = city
         save_config(self.config_data)
         self.running = True
         self.start_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
-        self._set_status("מאזין להתרעות...", "green", "🟢")
-        self._log(f"▶ מתחיל מעקב | עיר: {city} | נורה: {ip}")
+        if ip:
+            self._set_status("מאזין להתרעות...", "green", "🟢")
+            self.title("🚨 התרעות פיקוד העורף → WiZ — V4")
+            self._log(f"▶ מתחיל מעקב | עיר: {city} | נורה: {ip}")
+            self.demo_banner.pack_forget()
+        else:
+            self._set_status("מצב דמו — ללא נורה", "orange", "🟠")
+            self.title("🚨 התרעות פיקוד העורף → WiZ — V4 | ⚠️ מצב דמו — ללא נורה")
+            self._log(f"▶ מצב דמו (ללא נורה) | עיר: {city} | ביומן ובהבהוב בלבד")
+            self.demo_banner.pack(fill="x", padx=12, pady=4)
         threading.Thread(target=self._monitor_loop, daemon=True).start()
 
     def _stop(self):
@@ -388,6 +410,8 @@ class App(tk.Tk):
         self.start_btn.config(state="normal")
         self.stop_btn.config(state="disabled")
         self._set_status("לא פעיל", "gray", "⚫")
+        self.title("🚨 התרעות פיקוד העורף → WiZ — V4")
+        self.demo_banner.pack_forget()
         self._log("⏹ המעקב הופסק")
 
     def _test_lamp(self):
@@ -408,15 +432,19 @@ class App(tk.Tk):
 
     def _simulate(self, cat):
         color = ALERT_COLORS.get(cat, {"r": 255, "g": 0, "b": 0, "name": "🔴 התרעה"})
-        self._log(f"🧪 סימולציה: {color['name']}")
-        self._set_status(f"סימולציה: {color['name']}", "orange", "🟠")
+        ip = self.ip_var.get().strip()
+        if ip:
+            self._log(f"🧪 סימולציה: {color['name']}")
+            self._set_status(f"⚠️ סימולציה: {color['name']}", "orange", "🟠")
+        else:
+            self._log(f"🧪 סימולציה דמו (ללא נורה): {color['name']}")
+            self._set_status(f"⚠️ דמו בלבד — ללא נורה: {color['name']}", "orange", "🟠")
 
-        # צבע רקע של החלון לפי סוג ההתרעה
+        # הבהוב החלון בכל מקרה
         hex_color = "#{:02x}{:02x}{:02x}".format(
             min(color["r"], 200), min(color["g"], 200), min(color["b"], 200))
         self._flash_window(hex_color)
 
-        ip = self.ip_var.get().strip()
         if ip:
             def _do():
                 try:
@@ -431,9 +459,11 @@ class App(tk.Tk):
                     self._log(f"❌ שגיאה בנורה: {e}")
             threading.Thread(target=_do, daemon=True).start()
         else:
-            self._log("💡 אין נורה מוגדרת — מציג בממשק בלבד")
+            self._log("💡 מציג בממשק בלבד — אין נורה")
             self.after(5000, lambda: [
-                self._set_status("לא פעיל", "gray", "⚫"),
+                self._set_status("מצב דמו — ללא נורה" if self.running else "לא פעיל",
+                                 "orange" if self.running else "gray",
+                                 "🟠" if self.running else "⚫"),
                 self.configure(bg="SystemButtonFace")
             ])
 
