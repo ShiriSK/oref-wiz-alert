@@ -275,7 +275,7 @@ class App(tk.Tk):
         adv_toggle.pack(pady=2)
         self.adv_toggle_btn = adv_toggle
 
-        self.adv_frame = ttk.LabelFrame(self, text="התרעות נוספות (כבויות כברירת מחדל)")
+        self.adv_frame = ttk.LabelFrame(self, text="הגדרות מתקדמות")
         self.optional_vars = {}
         optional_alerts = [
             ("5",  "🟣 רעידת אדמה"),
@@ -288,6 +288,12 @@ class App(tk.Tk):
             self.optional_vars[cat] = var
             tk.Checkbutton(self.adv_frame, text=name, variable=var,
                            font=("Arial", 9)).grid(row=0, column=i, padx=8, pady=4)
+
+        # Checkbox כל הארץ
+        self.all_country_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(self.adv_frame, text="🌍 הצג התרעות כל הארץ ביומן",
+                       variable=self.all_country_var,
+                       font=("Arial", 9, "bold")).grid(row=1, column=0, columnspan=4, pady=4, sticky="w", padx=8)
 
         # ─── סטטוס ───
         status_frame = ttk.LabelFrame(self, text="סטטוס")
@@ -484,6 +490,7 @@ class App(tk.Tk):
         alert_active = False
         alert_end_time = 0
         last_alert_id = None
+        seen_ids = set()
         ip = self.config_data["wiz_ip"]
         city = self.config_data["my_city"]
         try:
@@ -493,7 +500,6 @@ class App(tk.Tk):
 
         while self.running:
             try:
-                # נסה שני URLs
                 resp = requests.get(OREF_URL, headers=OREF_HEADERS, timeout=2)
                 if not resp.text.strip():
                     resp = requests.get(OREF_URL_BACKUP, headers=OREF_HEADERS, timeout=2)
@@ -505,28 +511,57 @@ class App(tk.Tk):
                     elif isinstance(data, list):
                         alerts = data
 
-                my_alerts = [
-                    a for a in alerts
-                    if any(
+                show_all = self.all_country_var.get()
+
+                # סינון — ברירת מחדל: עיר. אם "כל הארץ" מסומן: הכל
+                def is_relevant(a):
+                    if show_all:
+                        return True
+                    if not city.strip():
+                        return True
+                    return any(
                         city.strip() == c.strip() or
                         city.strip() in c.strip() or
                         c.strip() in city.strip()
                         for c in a.get("data", [])
                     )
-                    and (
-                        ALERT_COLORS.get(str(a.get("cat", "")), {}).get("default_on", True)
-                        or self.optional_vars.get(str(a.get("cat", "")), tk.BooleanVar(value=False)).get()
-                    )
-                ]
 
-                if my_alerts:
-                    alert = my_alerts[0]
+                relevant = [a for a in alerts if is_relevant(a)]
+
+                for alert in relevant:
                     alert_id = alert.get("id", "")
+                    if not alert_id or alert_id in seen_ids:
+                        continue
+                    seen_ids.add(alert_id)
+
                     cat = str(alert.get("cat", ""))
+                    cities_str = ", ".join(alert.get("data", []))
+
+                    # התרעה מקדימה
+                    if cat == "14":
+                        self._log(f"⚠️ התרעה מקדימה — בדקות הקרובות | {cities_str}")
+                        self._set_status("⚠️ התרעה מקדימה", "orange", "🟠")
+                        continue
+
+                    # התרעת סיום
+                    if cat == "13" and "הסתיים" in alert.get("title", ""):
+                        self._log(f"✅ ההתרעה הסתיימה | {cities_str}")
+                        continue
+
                     color = ALERT_COLORS.get(cat, {"r": 255, "g": 50, "b": 0, "name": "🟠 התרעה"})
-                    if not alert_active or alert_id != last_alert_id:
-                        cities_str = ", ".join(alert.get("data", []))
-                        self._log(f"🚨 {color['name']} | {cities_str}")
+                    enabled = (ALERT_COLORS.get(cat, {}).get("default_on", True)
+                               or self.optional_vars.get(cat, tk.BooleanVar(value=False)).get())
+                    if not enabled:
+                        continue
+
+                    self._log(f"🚨 {color['name']} | {cities_str}")
+
+                    # פעולות רק אם העיר תואמת (גם במצב כל הארץ — נורה רק לעיר שלי)
+                    city_match = not city.strip() or any(
+                        city.strip() == c.strip() or city.strip() in c.strip() or c.strip() in city.strip()
+                        for c in alert.get("data", [])
+                    )
+                    if city_match and (not alert_active or alert_id != last_alert_id):
                         self._set_status(f"{color['name']}", "red", "🔴")
                         hex_color = "#{:02x}{:02x}{:02x}".format(
                             min(color["r"], 200), min(color["g"], 200), min(color["b"], 200))
@@ -539,19 +574,19 @@ class App(tk.Tk):
                         alert_active = True
                         last_alert_id = alert_id
                         alert_end_time = time.time() + self.config_data["alert_duration_sec"]
-                else:
-                    if alert_active and time.time() > alert_end_time:
-                        self._log("✅ ההתרעה הסתיימה — חזרה לצבע רגיל")
-                        self._set_status("מאזין להתרעות...", "green", "🟢")
-                        try:
-                            run_async(set_color(ip, NORMAL["r"], NORMAL["g"], NORMAL["b"], NORMAL["brightness"]))
-                        except:
-                            pass
-                        alert_active = False
-                        last_alert_id = None
+
+                if not relevant and alert_active and time.time() > alert_end_time:
+                    self._log("✅ ההתרעה הסתיימה — חזרה לצבע רגיל")
+                    self._set_status("מאזין להתרעות...", "green", "🟢")
+                    try:
+                        run_async(set_color(ip, NORMAL["r"], NORMAL["g"], NORMAL["b"], NORMAL["brightness"]))
+                    except:
+                        pass
+                    alert_active = False
+                    last_alert_id = None
 
             except Exception as e:
-                self._log(f"⚠️ שגיאת רשת: {e}")
+                pass  # שגיאות רשת — בשקט
 
             time.sleep(self.config_data["poll_interval_sec"])
 
