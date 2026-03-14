@@ -20,7 +20,7 @@ from pywizlight import wizlight, PilotBuilder, discovery
 
 # ─── קובץ הגדרות ───
 CONFIG_FILE = os.path.join(os.path.expanduser("~"), "oref_wiz_config.json")
-DEFAULT_CONFIG = {"wiz_ip": "", "my_city": "", "poll_interval_sec": 2, "alert_duration_sec": 60}
+DEFAULT_CONFIG = {"wiz_ip": "", "my_city": "", "poll_interval_sec": 1, "alert_duration_sec": 60}
 
 def load_config():
     if os.path.exists(CONFIG_FILE):
@@ -51,11 +51,14 @@ ALERT_COLORS = {
 NORMAL = {"r": 255, "g": 220, "b": 150, "brightness": 180}
 
 OREF_URL = "https://www.oref.org.il/WarningMessages/alert/alerts.json"
-CITIES_URL = "https://www.oref.org.il/Shared/Ajax/GetCitiesMix.aspx?lang=he"
+OREF_URL_BACKUP = "https://www.oref.org.il/warningMessages/alert/Alerts.json"
 OREF_HEADERS = {
     "Referer": "https://www.oref.org.il/",
     "X-Requested-With": "XMLHttpRequest",
-    "User-Agent": "Mozilla/5.0",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/javascript, */*; q=0.01",
+    "Accept-Language": "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Connection": "keep-alive",
 }
 
 # ─── רשימת ערים קבועה ───
@@ -363,8 +366,8 @@ class App(tk.Tk):
         self.extra_sim_visible = not self.extra_sim_visible
 
     def _log(self, msg):
-        # התעלם משגיאות BOM טכניות
-        if "UTF-8 BOM" in msg or "utf-8-sig" in msg:
+        # התעלם משגיאות טכניות
+        if any(x in msg for x in ["UTF-8 BOM", "utf-8-sig", "Expecting value", "JSONDecodeError"]):
             return
         ts = time.strftime("%H:%M:%S")
         line = f"[{ts}] {msg}\n"
@@ -490,7 +493,10 @@ class App(tk.Tk):
 
         while self.running:
             try:
-                resp = requests.get(OREF_URL, headers=OREF_HEADERS, timeout=4)
+                # נסה שני URLs
+                resp = requests.get(OREF_URL, headers=OREF_HEADERS, timeout=2)
+                if not resp.text.strip():
+                    resp = requests.get(OREF_URL_BACKUP, headers=OREF_HEADERS, timeout=2)
                 alerts = []
                 if resp.status_code == 200 and resp.text.strip():
                     data = resp.json()
@@ -501,7 +507,12 @@ class App(tk.Tk):
 
                 my_alerts = [
                     a for a in alerts
-                    if any(city in c or c in city for c in a.get("data", []))
+                    if any(
+                        city.strip() == c.strip() or
+                        city.strip() in c.strip() or
+                        c.strip() in city.strip()
+                        for c in a.get("data", [])
+                    )
                     and (
                         ALERT_COLORS.get(str(a.get("cat", "")), {}).get("default_on", True)
                         or self.optional_vars.get(str(a.get("cat", "")), tk.BooleanVar(value=False)).get()
