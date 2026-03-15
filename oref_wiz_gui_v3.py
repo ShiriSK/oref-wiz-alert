@@ -18,6 +18,16 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from pywizlight import wizlight, PilotBuilder, discovery
 
+def safe_json(resp):
+    try:
+        text = resp.text.strip()
+        if text.startswith(")]}',"):
+            text = text[5:]
+        return json.loads(text)
+    except:
+        return None
+
+
 # ─── קובץ הגדרות ───
 CONFIG_FILE = os.path.join(os.path.expanduser("~"), "oref_wiz_config.json")
 DEFAULT_CONFIG = {"wiz_ip": "", "my_city": "", "poll_interval_sec": 1, "alert_duration_sec": 60}
@@ -30,7 +40,10 @@ def load_config():
         except:
             pass
     return DEFAULT_CONFIG.copy()
-
+# זה הופך את הכתובת לדינמית - השרת יחשוב שכל בקשה היא חדשה
+def get_oref_url():
+    return f"https://www.oref.org.il/WarningMessages/alert/alerts.json?v={int(time.time())}"
+    
 def save_config(cfg):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
@@ -38,7 +51,7 @@ def save_config(cfg):
 # ─── צבעים ───
 ALERT_COLORS = {
     "1":   {"r": 255, "g": 0,   "b": 0,   "name": "🔴 ירי רקטות",          "default_on": True},
-    "2":   {"r": 255, "g": 0,   "b": 0,   "name": "🔴 ירי לא מזוהה",       "default_on": True},
+    "10":  {"r": 255, "g": 255, "b": 0,   "name": "🟡 בדיקת צופרים/התראה",  "default_on": True}, # הוסף את זה!
     "3":   {"r": 255, "g": 140, "b": 0,   "name": "🟠 חדירת כלי טיס",      "default_on": True},
     "4":   {"r": 0,   "g": 220, "b": 0,   "name": "🟢 חדירת מחבלים",       "default_on": True},
     "13":  {"r": 255, "g": 0,   "b": 0,   "name": "🔴 פיגוע",               "default_on": True},
@@ -49,8 +62,10 @@ ALERT_COLORS = {
     "8":   {"r": 0,   "g": 100, "b": 255, "name": "🔵 צונאמי",              "default_on": False},
 }
 NORMAL = {"r": 255, "g": 220, "b": 150, "brightness": 180}
-
-OREF_URL = "https://www.oref.org.il/WarningMessages/alert/alerts.json"
+#import time
+# הוספת סימן שאלה וזמן נוכחי גורמת לשרת לחשוב שזו בקשה חדשה לגמרי
+OREF_URL = f"https://www.oref.org.il/WarningMessages/alert/alerts.json?v={int(time.time())}"
+#OREF_URL = "https://www.oref.org.il/WarningMessages/alert/alerts.json"
 OREF_URL_BACKUP = "https://www.oref.org.il/warningMessages/alert/Alerts.json"
 OREF_HEADERS = {
     "Referer": "https://www.oref.org.il/",
@@ -59,11 +74,15 @@ OREF_HEADERS = {
     "Accept": "application/json, text/javascript, */*; q=0.01",
     "Accept-Language": "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7",
     "Connection": "keep-alive",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache"
 }
+
+
 
 # ─── רשימת ערים קבועה ───
 CITIES = sorted([
-    "אבו גוש", "אבו סנאן", "אבו קורינאת (שבט)", "אום אל-פחם", "אום אל-קוטוף",
+    "כל הארץ","אבו גוש", "אבו סנאן", "אבו קורינאת (שבט)", "אום אל-פחם", "אום אל-קוטוף",
     "אופקים", "אור יהודה", "אור עקיבא", "אורנית", "אחיהוד", "אחיסמך", "אילת",
     "אכסאל", "אל-בטוף", "אל-עזאזמה", "אלון שבות", "אלוני אבא", "אלעד",
     "אלקנה", "אמירים", "אמנון", "אעבלין", "אפרת", "אקרה", "אראבה",
@@ -134,10 +153,23 @@ def run_async(coro):
     loop.run_until_complete(coro)
     loop.close()
 
-async def set_color(ip, r, g, b, brightness=255):
+async def set_light_color(ip, r, g, b, brightness=255, flash=False):
     bulb = wizlight(ip)
-    await bulb.turn_on(PilotBuilder(rgb=(r, g, b), brightness=brightness))
-    await bulb.async_close()
+    try:
+        if flash:
+            # לוגיקת ההבהוב שלך...
+            pass
+        await bulb.turn_on(PilotBuilder(rgb=(r, g, b), brightness=brightness))
+    finally:
+        # זה החלק החשוב - סגירה מסודרת לפני שהלופ נסגר
+        await bulb.async_close()
+
+
+
+
+
+
+
 
 async def flash_and_set(ip, r, g, b):
     bulb = wizlight(ip)
@@ -151,7 +183,10 @@ async def flash_and_set(ip, r, g, b):
 async def discover_wiz_bulbs():
     """סריקת רשת לאיתור נורות WiZ"""
     try:
-        bulbs = await discovery.find_wizlights(wait_time=3)
+        bulbs = await discovery.find_wizlights(
+            broadcast_space=get_local_broadcast(),
+            wait_time=3
+        )
         return [b.ip for b in bulbs]
     except:
         return []
@@ -372,15 +407,16 @@ class App(tk.Tk):
         self.extra_sim_visible = not self.extra_sim_visible
 
     def _log(self, msg):
-        # התעלם משגיאות טכניות
-        if any(x in msg for x in ["UTF-8 BOM", "utf-8-sig", "Expecting value", "JSONDecodeError"]):
-            return
-        ts = time.strftime("%H:%M:%S")
-        line = f"[{ts}] {msg}\n"
-        self.log_box.config(state="normal")
-        self.log_box.insert("end", line)
-        self.log_box.see("end")
-        self.log_box.config(state="disabled")
+        def write():
+            if any(x in msg for x in ["UTF-8 BOM", "utf-8-sig", "Expecting value", "JSONDecodeError"]):
+                return
+            ts = time.strftime("%H:%M:%S")
+            line = f"[{ts}] {msg}\n"
+            self.log_box.config(state="normal")
+            self.log_box.insert("end", line)
+            self.log_box.see("end")
+            self.log_box.config(state="disabled")
+        self.after(0, write)
 
     def _set_status(self, text, color, dot):
         self.status_label.config(text=text)
@@ -477,14 +513,14 @@ class App(tk.Tk):
             ])
 
     def _flash_window(self, color):
-        """הבהוב חלון הממשק בצבע ההתרעה"""
-        def _do():
-            for i in range(6):
-                bg = color if i % 2 == 0 else "SystemButtonFace"
-                self.configure(bg=bg)
-                time.sleep(0.35)
-            self.configure(bg=color)
-        threading.Thread(target=_do, daemon=True).start()
+        def flash(i=0):
+            if i >= 6:
+                self.configure(bg=color)
+                return
+            bg = color if i % 2 == 0 else "SystemButtonFace"
+            self.configure(bg=bg)
+            self.after(350, lambda: flash(i+1))
+        self.after(0, flash)
 
     def _monitor_loop(self):
         alert_active = False
@@ -498,14 +534,24 @@ class App(tk.Tk):
         except:
             pass
 
+
         while self.running:
             try:
-                resp = requests.get(OREF_URL, headers=OREF_HEADERS, timeout=2)
+                #resp = requests.get(OREF_URL, headers=OREF_HEADERS, timeout=4)
+                # קריאה לכתובת החדשה שנוצרת בכל רגע עם ה-timestamp
+                # יצירת הכתובת עם Timestamp מעודכן ממש ברגע זה
+                #resp = requests.get(get_oref_url(), headers=OREF_HEADERS, timeout=2)
+                current_url = f"https://www.oref.org.il/WarningMessages/alert/alerts.json?v={int(time.time())}"
+        
+                resp = requests.get(current_url, headers=OREF_HEADERS, timeout=2)
+                
                 if not resp.text.strip():
-                    resp = requests.get(OREF_URL_BACKUP, headers=OREF_HEADERS, timeout=2)
+                    resp = requests.get(OREF_URL_BACKUP, headers=OREF_HEADERS, timeout=4)
                 alerts = []
                 if resp.status_code == 200 and resp.text.strip():
-                    data = resp.json()
+                    data = safe_json(resp)
+                    if not data:
+                        continue
                     if isinstance(data, dict) and "data" in data:
                         alerts = [data]
                     elif isinstance(data, list):
@@ -514,18 +560,20 @@ class App(tk.Tk):
                 show_all = self.all_country_var.get()
 
                 # סינון — ברירת מחדל: עיר. אם "כל הארץ" מסומן: הכל
+                # לוגיקת סינון מתוקנת
                 def is_relevant(a):
-                    if show_all:
+                    current_city = city.strip()
+                    # אם בחרת "כל הארץ" ברשימה או שסימנת את הצ'קבוקס - הכל רלוונטי
+                    if current_city == "כל הארץ" or self.all_country_var.get() or not current_city:
                         return True
-                    if not city.strip():
-                        return True
+    
+                    # בדיקת התאמה ספציפית לעיר
                     return any(
-                        city.strip() == c.strip() or
-                        city.strip() in c.strip() or
-                        c.strip() in city.strip()
+                        current_city == c.strip() or 
+                        current_city in c.strip() or 
+                        c.strip() in current_city
                         for c in a.get("data", [])
                     )
-
                 relevant = [a for a in alerts if is_relevant(a)]
 
                 for alert in relevant:
@@ -533,6 +581,8 @@ class App(tk.Tk):
                     if not alert_id or alert_id in seen_ids:
                         continue
                     seen_ids.add(alert_id)
+                    if len(seen_ids) > 200:
+                        seen_ids = set(list(seen_ids)[-100:])
 
                     cat = str(alert.get("cat", ""))
                     cities_str = ", ".join(alert.get("data", []))
@@ -595,11 +645,26 @@ class App(tk.Tk):
         self.destroy()
 
 
-def run_async_return(coro):
-    loop = asyncio.new_event_loop()
-    result = loop.run_until_complete(coro)
-    loop.close()
-    return result
+def run_async(coro):
+    try:
+        # asyncio.run מנהל את הלופ בצורה נקייה יותר
+        return asyncio.run(coro)
+    except RuntimeError:
+        # אם יש בעיה בלופ הקיים, יוצר אחד חדש (למקרים קיצוניים)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
+
+
+
+
+
+
+
+
 
 
 if __name__ == "__main__":
