@@ -1,93 +1,109 @@
 # 🚨 OrefWiz Alert — V3
-### מערכת התרעות חזותית לחירשים וכבדי שמיעה
 
-> Developed by **Shiri Schnapp Kashi**
+מערכת התרעות חזותית לחירשים וכבדי שמיעה
+
 ![OrefWiz Alert GUI](GUI_WIZ_ALERT.png)
+
+> Developed by **Shiri Schnapp Kashi** | [shiri@designservice.co.il](mailto:shiri@designservice.co.il)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Platform: Windows](https://img.shields.io/badge/platform-Windows-lightgrey.svg)]()
 
 ---
 
 ## 💡 הרעיון
 
-מה קורה לאדם חירש או כבד שמיעה כשהאזעקה מופעלת בלילה?  
-הוא ישן. הוא לא שומע. הזמן רץ.
+אנשים חירשים וכבדי שמיעה לא שומעים את צופר האזעקה. 
+המערכת הזו מתחברת לפיקוד העורף ומפעילה נורה חכמה (WiZ) בצבע אדום כשיש התרעה.
 
-**OrefWiz** מתחברת ל-API של פיקוד העורף ועם כל התרעה — שולחת פקודה לנורת LED חכמה לשנות צבע ולהבהב.
+## ✨ תכונות
 
----
+- 🔴 הבהוב נורה חכמה בעת התרעה
+- 📍 סינון לפי עיר או "כל הארץ"
+- 🎨 צבעים שונים לסוגי התרעות שונים
+- 📱 תמיכה בטלגרם (בוט)
+- 💻 ממשק גרפי פשוט בעברית
+- ⚡ בדיקה כל 0.5 שניות
 
-## 🎨 צבעים לפי סוג ההתרעה
+## 🚀 התקנה מהירה
 
-| סוג | צבע |
-|-----|-----|
-| 🔴 ירי רקטות וטילים | אדום בוהק |
-| 🟢 חדירת מחבלים | ירוק בהיר |
-| 🟠 חדירת כלי טיס | כתום |
-| 🔴 פיגוע | אדום |
-| 🟣 רעידת אדמה | סגול *(כבוי כברירת מחדל)* |
-| 🔵 צונאמי | כחול *(כבוי כברירת מחדל)* |
-| 🟡 אירוע כימי | צהוב *(כבוי כברירת מחדל)* |
-| 🟢 חומרים רדיואקטיביים | ירוק *(כבוי כברירת מחדל)* |
+### דרישות
+- Python 3.9 ומעלה
+- נורת WiZ חכמה (אופציונלי)
 
----
-
-## 🛒 מה צריך לקנות
-
-נורת **WiZ RGB E27** — נמכרת בבאג, Bug, iDigital בכ-80 ש"ח.  
-פשוט מברגים אותה לכל מנורה רגילה עם שקע E27.
-
----
-
-## ⚡ התקנה
+### שלבים
 
 ```bash
-pip install pywizlight requests
+# 1. Clone the repository
+git clone https://github.com/ShiriSK/oref-wiz-alert.git
+cd oref-wiz-alert
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Run the application
 python oref_wiz_gui_v3.py
 ```
 
----
+## 📁 מבנה הפרויקט
 
-## ⚙️ הגדרה
-
-1. פתח את האפליקציה
-2. הכנס את **IP הנורה** — נמצא באפליקציית WiZ ← Settings ← Device IP
-3. הכנס את **שם העיר שלך בעברית** (לדוגמה: `אום אל-פחם`, `תל אביב - מרכז העיר`)
-4. לחץ **התחל מעקב**
-
----
-
-## 🔧 הפעלה אוטומטית עם Windows
-
-כדי שהאפליקציה תעלה אוטומטית עם Windows:
-
-1. לחץ `Win + R` ← הקלד `shell:startup`
-2. צור קובץ `oref_alert.bat`:
-```batch
-@echo off
-pythonw "C:\path\to\oref_wiz_gui_v3.py"
+```
+oref-wiz-alert/
+├── oref_wiz_gui_v3.py    # Main GUI application
+├── test_oref.py          # Test script for API connection
+├── debug/
+│   └── oref_debug.py     # Debug version with extra logging
+├── requirements.txt
+├── README.md
+├── LICENSE
+└── CONTRIBUTING.md
 ```
 
----
+## 🔧 שימוש
+
+1. **הפעל את התוכנה** - `python oref_wiz_gui_v3.py`
+2. **בחר עיר** - או סמן "כל הארץ"
+3. **הכנס IP של נורה** (אופציונלי) - מצא באפליקציית WiZ
+4. **לחץ "התחל מעקב"**
+
+### ללא נורה
+התוכנה תעבוד גם ללא נורה - תציג התרעות ביומן ותבהב את החלון.
+
+### עם נורת WiZ
+1. התקן את אפליקציית WiZ
+2. חבר את הנורה לרשת
+3. מצא את ה-IP בהגדרות הנורה
+4. הכנס את ה-IP בתוכנה
+
+## 🐛 דיבוג
+
+אם יש בעיות, הרץ את גרסת הדיבוג:
+
+```bash
+python debug/oref_debug.py
+```
+
+זה יציג לוגים מפורטים של מה שמגיע מהשרת.
+
+## 📱 בוט טלגרם
+
+ראה את הקובץ `telegram_bot.py` להפעלת בוט טלגרם שישלח התרעות.
 
 ## ⚠️ הערות חשובות
 
-- ה-API של פיקוד העורף **זמין רק מישראל**
-- הנורה והמחשב חייבים להיות **באותה רשת WiFi**
-- המחשב חייב להיות **דלוק ומחובר** כדי שהמערכת תעבוד
+- המערכת מסתמכת על API של פיקוד העורף
+- ההתרעות נשארות באתר רק מספר שניות
+- מומלץ להשאיר את התוכנה רצה ברקע
 
----
+## 🤝 תרומה
 
-## 🤝 שיתוף פעולה
-
-אני מזמין את **אגודת החירשים בישראל (אח"א)** ואת **פיקוד העורף** לראות את הפרויקט ולשתף פעולה.  
-הטכנולוגיה כבר קיימת — נשאר רק לגשר על הפער.
-
-📧 **shiri@designservice.co.il**
-
----
+תרומות מתקבלות בברכה! ראה [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## 📄 רישיון
 
-MIT — קוד פתוח, חינמי, זמין לכולם.
+MIT License - ראה [LICENSE](LICENSE)
+
+---
+
+**שימו לב:** זו מערכת עזר בלבד. תמיד הקשיבו להנחיות פיקוד העורף הרשמיות.
