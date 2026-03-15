@@ -38,7 +38,7 @@ DEFAULT_CONFIG = {
     "ble_address": "",
     "my_city": "",
     "poll_interval_sec": 0.5,
-    "alert_duration_sec": 60
+    "alert_duration_sec": 120  # 2 minutes - keep light on longer
 }
 
 def load_config():
@@ -202,12 +202,12 @@ async def ble_set_color(address, r, g, b):
         await client.write_gatt_char(BLE_CHAR_UUID, cmd, response=False)
 
 async def ble_turn_off(address):
-    """הנורה על שחור (כבויה לגמרי)"""
+    """הנורה על עמעום מינימלי (כמעט כבויה אבל ערה)"""
     if not HAS_BLE:
         return
     async with BleakClient(address, timeout=10) as client:
-        # שחור מלא
-        cmd = bytes([0x7e, 0x00, 0x05, 0x03, 0, 0, 0, 0x00, 0xef])
+        # עמעום מינימלי - הנורה ערה אבל כמעט לא נראית
+        cmd = bytes([0x7e, 0x00, 0x05, 0x03, 1, 1, 1, 0x00, 0xef])
         await client.write_gatt_char(BLE_CHAR_UUID, cmd, response=False)
 
 async def ble_flash_and_set(address, r, g, b):
@@ -656,45 +656,61 @@ class App(tk.Tk):
                     cat = str(alert.get("cat", ""))
                     cities_str = ", ".join(alert.get("data", []))
 
-                    # Skip early warning and end events
+                    # Skip early warning
                     if cat == "14":
                         self._log(f"⚠️ התרעה מקדימה | {cities_str}")
                         continue
+                    # End of event - start the countdown
                     if cat == "10":
                         self._log(f"✅ האירוע הסתיים | {cities_str}")
+                        if alert_active:
+                            alert_end_time = time.time() + 10  # 10 seconds after event ends
+                            self._log("⏱️ נורה תיכבה בעוד 10 שניות")
                         continue
 
                     color = ALERT_COLORS.get(cat, {"r": 255, "g": 50, "b": 0, "name": "🟠 התרעה"})
                     self._log(f"🚨 {color['name']} | {cities_str}")
 
                     # Check city match for light activation
-                    city_match = not city.strip() or any(
-                        city.strip() == c.strip() or city.strip() in c.strip() or c.strip() in city.strip()
-                        for c in alert.get("data", [])
+                    # אם "כל הארץ" מסומן או אין עיר - תמיד להדליק
+                    city_match = (
+                        show_all or
+                        not city.strip() or
+                        city == "כל הארץ" or
+                        any(
+                            city.strip() == c.strip() or city.strip() in c.strip() or c.strip() in city.strip()
+                            for c in alert.get("data", [])
+                        )
                     )
 
+                    self._log(f"🔍 בדיקת עיר: city_match={city_match}")
+
                     if city_match and (not alert_active or alert_id != last_alert_id):
+                        self._log(f"💡 מדליק נורה!")
                         self._set_status(f"{color['name']}", "red", "🔴")
                         hex_color = "#{:02x}{:02x}{:02x}".format(
                             min(color["r"], 200), min(color["g"], 200), min(color["b"], 200))
                         self._flash_window(hex_color)
 
-                        # Flash light
-                        try:
-                            if lt == "wiz" and wiz_ip:
-                                run_async(wiz_flash_and_set(wiz_ip, color["r"], color["g"], color["b"]))
-                            elif lt == "ble" and ble_addr:
-                                run_async(ble_flash_and_set(ble_addr, color["r"], color["g"], color["b"]))
-                        except Exception as e:
-                            self._log(f"❌ נורה: {e}")
+                        # Flash light in separate thread (non-blocking)
+                        def flash_light():
+                            try:
+                                if lt == "wiz" and wiz_ip:
+                                    run_async(wiz_flash_and_set(wiz_ip, color["r"], color["g"], color["b"]))
+                                elif lt == "ble" and ble_addr:
+                                    run_async(ble_flash_and_set(ble_addr, color["r"], color["g"], color["b"]))
+                                self._log("✅ נורה הודלקה!")
+                            except Exception as e:
+                                self._log(f"❌ נורה: {e}")
+                        threading.Thread(target=flash_light, daemon=True).start()
 
                         alert_active = True
                         last_alert_id = alert_id
-                        alert_end_time = time.time() + self.config_data["alert_duration_sec"]
+                        alert_end_time = time.time() + 3600  # שעה - נכבה רק כשיש "האירוע הסתיים"
 
-                # Return to normal after alert ends
-                if not relevant and alert_active and time.time() > alert_end_time:
-                    self._log("✅ ההתרעה הסתיימה — נורה על עמעום")
+                # Return to normal after event ended + 2 minutes
+                if alert_active and time.time() > alert_end_time:
+                    self._log("✅ נורה כבויה")
                     self._set_status("מאזין להתרעות...", "green", "🟢")
                     try:
                         if lt == "ble" and ble_addr:
