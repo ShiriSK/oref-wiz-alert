@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🚨 התרעות פיקוד העורף → נורת WiZ — V4
-אפליקציה עצמאית — ללא צורך בהתקנת Python
+🚨 התרעות פיקוד העורף → נורה חכמה — V7
+תמיכה ב: WiZ (WiFi) + BLE Bluetooth (LotusLamp)
 
 Developed by Shiri Schnapp Kashi
 Contact: shiri@designservice.co.il
@@ -16,11 +16,30 @@ import os
 import socket
 import tkinter as tk
 from tkinter import ttk, messagebox
-from pywizlight import wizlight, PilotBuilder, discovery
+
+# Try to import optional libraries
+try:
+    from pywizlight import wizlight, PilotBuilder, discovery
+    HAS_WIZ = True
+except ImportError:
+    HAS_WIZ = False
+
+try:
+    from bleak import BleakClient, BleakScanner
+    HAS_BLE = True
+except ImportError:
+    HAS_BLE = False
 
 # ─── קובץ הגדרות ───
 CONFIG_FILE = os.path.join(os.path.expanduser("~"), "oref_wiz_config.json")
-DEFAULT_CONFIG = {"wiz_ip": "", "my_city": "", "poll_interval_sec": 0.5, "alert_duration_sec": 60}
+DEFAULT_CONFIG = {
+    "light_type": "none",  # none, wiz, ble
+    "wiz_ip": "",
+    "ble_address": "",
+    "my_city": "",
+    "poll_interval_sec": 0.5,
+    "alert_duration_sec": 60
+}
 
 def load_config():
     if os.path.exists(CONFIG_FILE):
@@ -48,7 +67,9 @@ ALERT_COLORS = {
     "7":   {"r": 255, "g": 255, "b": 0,   "name": "🟡 אירוע כימי",          "default_on": False},
     "8":   {"r": 0,   "g": 100, "b": 255, "name": "🔵 צונאמי",              "default_on": False},
 }
-NORMAL = {"r": 255, "g": 220, "b": 150, "brightness": 180}
+# הנורה על לבן עמום ברוב הזמן, לבן בהיר באזעקה
+STANDBY_COLOR = {"r": 10, "g": 10, "b": 10}  # כמעט כבויה
+ALERT_BRIGHTNESS = {"r": 255, "g": 255, "b": 255}  # לבן מקסימלי
 
 OREF_URL = "https://www.oref.org.il/WarningMessages/alert/alerts.json"
 OREF_URL_BACKUP = "https://www.oref.org.il/warningMessages/alert/Alerts.json"
@@ -59,6 +80,8 @@ OREF_HEADERS = {
     "Accept": "application/json, text/javascript, */*; q=0.01",
     "Accept-Language": "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7",
     "Connection": "keep-alive",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
 }
 
 # ─── רשימת ערים קבועה ───
@@ -128,18 +151,29 @@ CITIES = sorted([
     "שגב-שלום", "הר אדר", "גבעות בר",
 ])
 
-# ─── WiZ ───
+# ─── Async helpers ───
 def run_async(coro):
     loop = asyncio.new_event_loop()
     loop.run_until_complete(coro)
     loop.close()
 
-async def set_color(ip, r, g, b, brightness=255):
+def run_async_return(coro):
+    loop = asyncio.new_event_loop()
+    result = loop.run_until_complete(coro)
+    loop.close()
+    return result
+
+# ─── WiZ Control ───
+async def wiz_set_color(ip, r, g, b, brightness=255):
+    if not HAS_WIZ:
+        return
     bulb = wizlight(ip)
     await bulb.turn_on(PilotBuilder(rgb=(r, g, b), brightness=brightness))
     await bulb.async_close()
 
-async def flash_and_set(ip, r, g, b):
+async def wiz_flash_and_set(ip, r, g, b):
+    if not HAS_WIZ:
+        return
     bulb = wizlight(ip)
     for i in range(6):
         br = 255 if i % 2 == 0 else 20
@@ -149,30 +183,55 @@ async def flash_and_set(ip, r, g, b):
     await bulb.async_close()
 
 async def discover_wiz_bulbs():
-    """סריקת רשת לאיתור נורות WiZ"""
+    if not HAS_WIZ:
+        return []
     try:
         bulbs = await discovery.find_wizlights(wait_time=3)
         return [b.ip for b in bulbs]
     except:
         return []
 
-def get_local_broadcast():
-    """קבלת כתובת broadcast של הרשת המקומית"""
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        parts = ip.split(".")
-        return f"{parts[0]}.{parts[1]}.{parts[2]}.255"
-    except:
-        return "192.168.1.255"
+# ─── BLE Control (LotusLamp) ───
+BLE_CHAR_UUID = "0000fff3-0000-1000-8000-00805f9b34fb"
+
+async def ble_set_color(address, r, g, b):
+    if not HAS_BLE:
+        return
+    async with BleakClient(address, timeout=10) as client:
+        cmd = bytes([0x7e, 0x00, 0x05, 0x03, r, g, b, 0x00, 0xef])
+        await client.write_gatt_char(BLE_CHAR_UUID, cmd, response=False)
+
+async def ble_turn_off(address):
+    """הנורה על שחור (כבויה לגמרי)"""
+    if not HAS_BLE:
+        return
+    async with BleakClient(address, timeout=10) as client:
+        # שחור מלא
+        cmd = bytes([0x7e, 0x00, 0x05, 0x03, 0, 0, 0, 0x00, 0xef])
+        await client.write_gatt_char(BLE_CHAR_UUID, cmd, response=False)
+
+async def ble_flash_and_set(address, r, g, b):
+    if not HAS_BLE:
+        return
+    for i in range(6):
+        if i % 2 == 0:
+            await ble_set_color(address, r, g, b)
+        else:
+            await ble_set_color(address, 0, 0, 0)
+        await asyncio.sleep(0.35)
+    await ble_set_color(address, r, g, b)
+
+async def discover_ble_devices():
+    if not HAS_BLE:
+        return []
+    devices = await BleakScanner.discover(timeout=10)
+    return devices
 
 # ─── GUI ───
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("🚨 התרעות פיקוד העורף → WiZ — V4")
+        self.title("🚨 התרעות פיקוד העורף → נורה חכמה — V7")
         self.resizable(False, False)
         self.config_data = load_config()
         self.running = False
@@ -182,44 +241,67 @@ class App(tk.Tk):
     def _build_ui(self):
         pad = {"padx": 12, "pady": 6}
 
-        tk.Label(self, text="🚨 התרעות פיקוד העורף → נורת WiZ",
+        tk.Label(self, text="🚨 התרעות פיקוד העורף → נורה חכמה",
                  font=("Arial", 14, "bold")).pack(**pad)
 
-        # באנר מצב דמו — מוסתר כברירת מחדל
+        # באנר מצב דמו
         self.demo_banner = tk.Label(self,
             text="⚠️  מצב דמו — אין נורה מחוברת  ⚠️\nזה לא אמיתי — לבדיקה בלבד!",
             font=("Arial", 13, "bold"), fg="white", bg="#e67e22",
             pady=8)
-        # יוצג רק כשאין IP
 
-        # ─── הגדרות ───
-        frame = ttk.LabelFrame(self, text="הגדרות")
-        frame.pack(fill="x", padx=12, pady=6)
+        # ─── בחירת סוג נורה ───
+        light_frame = ttk.LabelFrame(self, text="סוג נורה")
+        light_frame.pack(fill="x", padx=12, pady=6)
 
-        # IP נורה + כפתור סריקה
-        tk.Label(frame, text="IP של הנורה:").grid(row=0, column=0, sticky="e", **pad)
-        self.ip_var = tk.StringVar(value=self.config_data["wiz_ip"])
-        tk.Entry(frame, textvariable=self.ip_var, width=18).grid(row=0, column=1, sticky="w", padx=4)
-        self.scan_btn = tk.Button(frame, text="🔍 סרוק רשת",
-                                  font=("Arial", 9), command=self._scan_network)
-        self.scan_btn.grid(row=0, column=2, padx=4)
-        tk.Label(frame, text="(לדוגמה: 192.168.1.45 — מצא ב: WiZ App ← Settings ← Device IP)",
-                 fg="gray", font=("Arial", 8)).grid(row=0, column=3, sticky="w")
+        self.light_type_var = tk.StringVar(value=self.config_data.get("light_type", "none"))
 
-        # עיר — Combobox עם רשימה קבועה
-        tk.Label(frame, text="העיר שלי:").grid(row=1, column=0, sticky="e", **pad)
-        self.city_var = tk.StringVar(value=self.config_data["my_city"])
-        self.city_combo = ttk.Combobox(frame, textvariable=self.city_var,
+        # ללא נורה
+        ttk.Radiobutton(light_frame, text="ללא נורה (הבהוב חלון בלבד)",
+                       variable=self.light_type_var, value="none",
+                       command=self._on_light_type_change).grid(row=0, column=0, sticky="w", padx=5, pady=2)
+
+        # WiZ WiFi
+        wiz_frame = ttk.Frame(light_frame)
+        wiz_frame.grid(row=1, column=0, sticky="w", padx=5, pady=2)
+        ttk.Radiobutton(wiz_frame, text="WiZ (WiFi):",
+                       variable=self.light_type_var, value="wiz",
+                       command=self._on_light_type_change).pack(side="left")
+        self.wiz_ip_var = tk.StringVar(value=self.config_data.get("wiz_ip", ""))
+        self.wiz_entry = ttk.Entry(wiz_frame, textvariable=self.wiz_ip_var, width=15)
+        self.wiz_entry.pack(side="left", padx=5)
+        self.wiz_scan_btn = ttk.Button(wiz_frame, text="🔍 סרוק", command=self._scan_wiz)
+        self.wiz_scan_btn.pack(side="left")
+
+        # BLE Bluetooth
+        ble_frame = ttk.Frame(light_frame)
+        ble_frame.grid(row=2, column=0, sticky="w", padx=5, pady=2)
+        ttk.Radiobutton(ble_frame, text="Bluetooth (LotusLamp):",
+                       variable=self.light_type_var, value="ble",
+                       command=self._on_light_type_change).pack(side="left")
+        self.ble_addr_var = tk.StringVar(value=self.config_data.get("ble_address", ""))
+        self.ble_entry = ttk.Entry(ble_frame, textvariable=self.ble_addr_var, width=20)
+        self.ble_entry.pack(side="left", padx=5)
+        self.ble_scan_btn = ttk.Button(ble_frame, text="🔍 סרוק", command=self._scan_ble)
+        self.ble_scan_btn.pack(side="left")
+
+        # ─── הגדרות עיר ───
+        city_frame = ttk.LabelFrame(self, text="הגדרות")
+        city_frame.pack(fill="x", padx=12, pady=6)
+
+        tk.Label(city_frame, text="העיר שלי:").grid(row=0, column=0, sticky="e", **pad)
+        self.city_var = tk.StringVar(value=self.config_data.get("my_city", ""))
+        self.city_combo = ttk.Combobox(city_frame, textvariable=self.city_var,
                                         width=25, state="normal")
         self.city_combo["values"] = CITIES
-        self.city_combo.grid(row=1, column=1, columnspan=2, sticky="w", padx=4)
-        self.city_combo.set(self.config_data["my_city"] or "בחרי עיר...")
-        # סגירת תפריט בלחיצת Enter או Tab
-        self.city_combo.bind("<Return>", lambda e: self.city_combo.event_generate("<Escape>"))
-        self.city_combo.bind("<Tab>", lambda e: self.city_combo.event_generate("<Escape>"))
-        self.city_combo.bind("<<ComboboxSelected>>", lambda e: self.focus())
-        tk.Label(frame, text="(בחרי מהרשימה או הקלידי ידנית)",
-                 fg="gray", font=("Arial", 8)).grid(row=1, column=3, sticky="w")
+        self.city_combo.grid(row=0, column=1, sticky="w", padx=4)
+        self.city_combo.set(self.config_data.get("my_city") or "בחרי עיר...")
+
+        # Checkbox כל הארץ
+        self.all_country_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(city_frame, text="🌍 הצג התרעות כל הארץ ביומן",
+                       variable=self.all_country_var,
+                       font=("Arial", 9)).grid(row=1, column=0, columnspan=2, pady=4, sticky="w", padx=8)
 
         # ─── סימולציה ───
         sim_frame = ttk.LabelFrame(self, text="סימולציה — בדיקה ללא אזעקה אמיתית")
@@ -235,19 +317,6 @@ class App(tk.Tk):
                       bg=bg, fg=fg,
                       command=lambda c=cat: self._simulate(c)
                       ).grid(row=0, column=i, padx=8, pady=6)
-
-        self.extra_sim_visible = False
-        self.extra_sim_btn = tk.Button(sim_frame, text="+ עוד",
-                                       font=("Arial", 8), fg="gray",
-                                       relief="flat", command=self._toggle_extra_sim)
-        self.extra_sim_btn.grid(row=0, column=3, padx=4)
-
-        self.extra_sim_frame = tk.Frame(sim_frame)
-        extra_alerts = [("3", "🔴 כלי טיס"), ("5", "🟣 רעידה"), ("7", "🟡 כימי")]
-        for i, (cat, name) in enumerate(extra_alerts):
-            tk.Button(self.extra_sim_frame, text=name, font=("Arial", 9), width=12,
-                      command=lambda c=cat: self._simulate(c)
-                      ).grid(row=0, column=i, padx=4, pady=4)
 
         # ─── כפתורים ראשיים ───
         btn_frame = tk.Frame(self)
@@ -266,34 +335,6 @@ class App(tk.Tk):
         tk.Button(btn_frame, text="🔦 בדוק נורה",
                   font=("Arial", 10), width=14,
                   command=self._test_lamp).grid(row=0, column=2, padx=6)
-
-        # ─── הגדרות מתקדמות (מוסתרות) ───
-        self.adv_visible = False
-        adv_toggle = tk.Button(self, text="⚙️ הגדרות מתקדמות ▼",
-                               font=("Arial", 8), fg="gray", relief="flat",
-                               command=self._toggle_advanced)
-        adv_toggle.pack(pady=2)
-        self.adv_toggle_btn = adv_toggle
-
-        self.adv_frame = ttk.LabelFrame(self, text="הגדרות מתקדמות")
-        self.optional_vars = {}
-        optional_alerts = [
-            ("5",  "🟣 רעידת אדמה"),
-            ("8",  "🔵 צונאמי"),
-            ("7",  "🟡 אירוע כימי"),
-            ("6",  "🟢 חומרים רדיואקטיביים"),
-        ]
-        for i, (cat, name) in enumerate(optional_alerts):
-            var = tk.BooleanVar(value=False)
-            self.optional_vars[cat] = var
-            tk.Checkbutton(self.adv_frame, text=name, variable=var,
-                           font=("Arial", 9)).grid(row=0, column=i, padx=8, pady=4)
-
-        # Checkbox כל הארץ
-        self.all_country_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(self.adv_frame, text="🌍 הצג התרעות כל הארץ ביומן",
-                       variable=self.all_country_var,
-                       font=("Arial", 9, "bold")).grid(row=1, column=0, columnspan=4, pady=4, sticky="w", padx=8)
 
         # ─── סטטוס ───
         status_frame = ttk.LabelFrame(self, text="סטטוס")
@@ -317,62 +358,28 @@ class App(tk.Tk):
         tk.Label(self, text="Developed by Shiri Schnapp Kashi | shiri@designservice.co.il",
                  fg="gray", font=("Arial", 7)).pack(pady=2)
 
-    # ─── הגדרות מתקדמות ───
-    def _toggle_advanced(self):
-        if self.adv_visible:
-            self.adv_frame.pack_forget()
-            self.adv_toggle_btn.config(text="⚙️ הגדרות מתקדמות ▼")
+        self._on_light_type_change()
+
+    def _on_light_type_change(self):
+        lt = self.light_type_var.get()
+        # Enable/disable relevant entry fields
+        if lt == "wiz":
+            self.wiz_entry.config(state="normal")
+            self.wiz_scan_btn.config(state="normal")
+            self.ble_entry.config(state="disabled")
+            self.ble_scan_btn.config(state="disabled")
+        elif lt == "ble":
+            self.wiz_entry.config(state="disabled")
+            self.wiz_scan_btn.config(state="disabled")
+            self.ble_entry.config(state="normal")
+            self.ble_scan_btn.config(state="normal")
         else:
-            self.adv_frame.pack(fill="x", padx=12, pady=4)
-            self.adv_toggle_btn.config(text="⚙️ הגדרות מתקדמות ▲")
-        self.adv_visible = not self.adv_visible
-
-    # ─── סריקת רשת ───
-    def _scan_network(self):
-        self.scan_btn.config(state="disabled", text="⏳ סורק...")
-        self._log("🔍 מחפש נורות WiZ ברשת...")
-
-        def _do():
-            try:
-                bulbs = run_async_return(discover_wiz_bulbs())
-                if bulbs:
-                    self.ip_var.set(bulbs[0])
-                    self._log(f"✅ נמצאו {len(bulbs)} נורות: {', '.join(bulbs)}")
-                    if len(bulbs) > 1:
-                        # אם יש יותר מנורה אחת — הצג תפריט בחירה
-                        self._show_bulb_selector(bulbs)
-                else:
-                    self._log("❌ לא נמצאו נורות WiZ ברשת")
-                    messagebox.showinfo("לא נמצאו נורות",
-                        "לא נמצאו נורות WiZ אוטומטית.\nנסי להזין את ה-IP ידנית מאפליקציית WiZ.")
-            except Exception as e:
-                self._log(f"❌ שגיאה בסריקה: {e}")
-            finally:
-                self.scan_btn.config(state="normal", text="🔍 סרוק רשת")
-
-        threading.Thread(target=_do, daemon=True).start()
-
-    def _show_bulb_selector(self, bulbs):
-        win = tk.Toplevel(self)
-        win.title("בחרי נורה")
-        tk.Label(win, text="נמצאו מספר נורות — בחרי אחת:",
-                 font=("Arial", 10)).pack(padx=12, pady=8)
-        for ip in bulbs:
-            tk.Button(win, text=ip, font=("Arial", 10), width=20,
-                      command=lambda i=ip: [self.ip_var.set(i), win.destroy()]
-                      ).pack(pady=3)
-
-    def _toggle_extra_sim(self):
-        if self.extra_sim_visible:
-            self.extra_sim_frame.grid_remove()
-            self.extra_sim_btn.config(text="+ עוד אפשרויות")
-        else:
-            self.extra_sim_frame.grid(row=1, column=0, columnspan=4, sticky="w", padx=4)
-            self.extra_sim_btn.config(text="− פחות")
-        self.extra_sim_visible = not self.extra_sim_visible
+            self.wiz_entry.config(state="disabled")
+            self.wiz_scan_btn.config(state="disabled")
+            self.ble_entry.config(state="disabled")
+            self.ble_scan_btn.config(state="disabled")
 
     def _log(self, msg):
-        # התעלם משגיאות טכניות
         if any(x in msg for x in ["UTF-8 BOM", "utf-8-sig", "Expecting value", "JSONDecodeError"]):
             return
         ts = time.strftime("%H:%M:%S")
@@ -386,32 +393,194 @@ class App(tk.Tk):
         self.status_label.config(text=text)
         self.status_dot.config(text=dot, fg=color)
 
+    # ─── סריקות ───
+    def _scan_wiz(self):
+        if not HAS_WIZ:
+            messagebox.showerror("שגיאה", "ספריית pywizlight לא מותקנת.\nהריצי: pip install pywizlight")
+            return
+        self.wiz_scan_btn.config(state="disabled", text="⏳")
+        self._log("🔍 מחפש נורות WiZ...")
+
+        def _do():
+            try:
+                bulbs = run_async_return(discover_wiz_bulbs())
+                if bulbs:
+                    self.wiz_ip_var.set(bulbs[0])
+                    self._log(f"✅ נמצאו {len(bulbs)} נורות: {', '.join(bulbs)}")
+                else:
+                    self._log("❌ לא נמצאו נורות WiZ")
+            except Exception as e:
+                self._log(f"❌ שגיאה: {e}")
+            finally:
+                self.wiz_scan_btn.config(state="normal", text="🔍 סרוק")
+
+        threading.Thread(target=_do, daemon=True).start()
+
+    def _scan_ble(self):
+        if not HAS_BLE:
+            messagebox.showerror("שגיאה", "ספריית bleak לא מותקנת.\nהריצי: pip install bleak")
+            return
+        self.ble_scan_btn.config(state="disabled", text="⏳")
+        self._log("🔍 מחפש מכשירי Bluetooth...")
+
+        def _do():
+            try:
+                devices = run_async_return(discover_ble_devices())
+                if devices:
+                    self._log(f"✅ נמצאו {len(devices)} מכשירים")
+                    self.after(0, lambda: self._show_ble_selector(devices))
+                else:
+                    self._log("❌ לא נמצאו מכשירים")
+            except Exception as e:
+                self._log(f"❌ שגיאה: {e}")
+            finally:
+                self.ble_scan_btn.config(state="normal", text="🔍 סרוק")
+
+        threading.Thread(target=_do, daemon=True).start()
+
+    def _show_ble_selector(self, devices):
+        win = tk.Toplevel(self)
+        win.title("בחרי מכשיר Bluetooth")
+        win.geometry("400x300")
+
+        tk.Label(win, text="בחרי את הנורה:", font=("Arial", 10)).pack(pady=8)
+
+        listbox = tk.Listbox(win, width=50, height=12, font=("Courier", 9))
+        listbox.pack(padx=10, pady=5, fill="both", expand=True)
+
+        for d in devices:
+            name = d.name or "Unknown"
+            listbox.insert("end", f"{name} | {d.address}")
+
+        def select():
+            sel = listbox.curselection()
+            if sel:
+                addr = devices[sel[0]].address
+                self.ble_addr_var.set(addr)
+                self._log(f"✅ נבחר: {addr}")
+            win.destroy()
+
+        tk.Button(win, text="בחר", command=select, font=("Arial", 10),
+                  bg="#2ecc71", fg="white").pack(pady=8)
+
+    # ─── בדיקת נורה ───
+    def _test_lamp(self):
+        lt = self.light_type_var.get()
+
+        if lt == "none":
+            self._log("💡 מצב ללא נורה - בדיקת הבהוב חלון")
+            self._flash_window("#ff0000")
+            return
+
+        if lt == "wiz":
+            ip = self.wiz_ip_var.get().strip()
+            if not ip:
+                messagebox.showwarning("חסר IP", "נא למלא IP של נורת WiZ")
+                return
+            self._log("🔦 בודק נורת WiZ...")
+            def _do():
+                try:
+                    run_async(wiz_flash_and_set(ip, 255, 0, 0))
+                    time.sleep(2)
+                    run_async(wiz_set_color(ip, NORMAL["r"], NORMAL["g"], NORMAL["b"], NORMAL["brightness"]))
+                    self._log("✅ נורה מגיבה!")
+                except Exception as e:
+                    self._log(f"❌ שגיאה: {e}")
+            threading.Thread(target=_do, daemon=True).start()
+
+        elif lt == "ble":
+            addr = self.ble_addr_var.get().strip()
+            if not addr:
+                messagebox.showwarning("חסרת כתובת", "נא למלא כתובת Bluetooth")
+                return
+            self._log("🔦 בודק נורת Bluetooth...")
+            def _do():
+                try:
+                    run_async(ble_flash_and_set(addr, 255, 0, 0))
+                    time.sleep(2)
+                    run_async(ble_turn_off(addr))  # כיבוי אחרי בדיקה
+                    self._log("✅ נורה מגיבה!")
+                except Exception as e:
+                    self._log(f"❌ שגיאה: {e}")
+            threading.Thread(target=_do, daemon=True).start()
+
+    # ─── סימולציה ───
+    def _simulate(self, cat):
+        color = ALERT_COLORS.get(cat, {"r": 255, "g": 0, "b": 0, "name": "🔴 התרעה"})
+        lt = self.light_type_var.get()
+
+        self._log(f"🧪 סימולציה: {color['name']}")
+        self._set_status(f"⚠️ סימולציה: {color['name']}", "orange", "🟠")
+
+        # הבהוב חלון
+        hex_color = "#{:02x}{:02x}{:02x}".format(
+            min(color["r"], 200), min(color["g"], 200), min(color["b"], 200))
+        self._flash_window(hex_color)
+
+        # הבהוב נורה
+        def _do():
+            try:
+                if lt == "wiz":
+                    ip = self.wiz_ip_var.get().strip()
+                    if ip:
+                        run_async(wiz_flash_and_set(ip, color["r"], color["g"], color["b"]))
+                        time.sleep(5)
+                        # כיבוי אחרי סימולציה
+                elif lt == "ble":
+                    addr = self.ble_addr_var.get().strip()
+                    if addr:
+                        run_async(ble_flash_and_set(addr, color["r"], color["g"], color["b"]))
+                        time.sleep(5)
+                        run_async(ble_turn_off(addr))  # כיבוי אחרי סימולציה
+
+                self._log("✅ סימולציה הסתיימה")
+                self._set_status("מאזין להתרעות..." if self.running else "לא פעיל",
+                                 "green" if self.running else "gray",
+                                 "🟢" if self.running else "⚫")
+            except Exception as e:
+                self._log(f"❌ שגיאה: {e}")
+
+        threading.Thread(target=_do, daemon=True).start()
+
+    def _flash_window(self, color):
+        def _do():
+            for i in range(6):
+                bg = color if i % 2 == 0 else "SystemButtonFace"
+                self.configure(bg=bg)
+                time.sleep(0.35)
+            self.configure(bg="SystemButtonFace")
+        threading.Thread(target=_do, daemon=True).start()
+
+    # ─── התחלה/עצירה ───
     def _start(self):
         city = self.city_var.get().strip()
-        ip = self.ip_var.get().strip()
-        if not city or city in ("בחרי עיר...", "⏳ טוען ערים..."):
+        lt = self.light_type_var.get()
+
+        if not city or city in ("בחרי עיר...", ""):
             messagebox.showwarning("חסר מידע", "נא לבחור עיר")
             return
-        if not ip:
-            if not messagebox.askyesno("ללא נורה",
-                "לא הוזן IP של נורה.\nהמעקב יעבוד — ביומן ובהבהוב החלון בלבד.\nלהמשיך?"):
-                return
-        self.config_data["wiz_ip"] = ip
+
+        # Save config
+        self.config_data["light_type"] = lt
+        self.config_data["wiz_ip"] = self.wiz_ip_var.get().strip()
+        self.config_data["ble_address"] = self.ble_addr_var.get().strip()
         self.config_data["my_city"] = city
         save_config(self.config_data)
+
         self.running = True
         self.start_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
-        if ip:
-            self._set_status("מאזין להתרעות...", "green", "🟢")
-            self.title("🚨 התרעות פיקוד העורף → WiZ — V4")
-            self._log(f"▶ מתחיל מעקב | עיר: {city} | נורה: {ip}")
-            self.demo_banner.pack_forget()
-        else:
+
+        if lt == "none":
             self._set_status("מצב דמו — ללא נורה", "orange", "🟠")
-            self.title("🚨 התרעות פיקוד העורף → WiZ — V4 | ⚠️ מצב דמו — ללא נורה")
-            self._log(f"▶ מצב דמו (ללא נורה) | עיר: {city} | ביומן ובהבהוב בלבד")
+            self._log(f"▶ מצב דמו (ללא נורה) | עיר: {city}")
             self.demo_banner.pack(fill="x", padx=12, pady=4)
+        else:
+            self._set_status("מאזין להתרעות...", "green", "🟢")
+            light_info = self.wiz_ip_var.get() if lt == "wiz" else self.ble_addr_var.get()
+            self._log(f"▶ מתחיל מעקב | עיר: {city} | נורה: {light_info}")
+            self.demo_banner.pack_forget()
+
         threading.Thread(target=self._monitor_loop, daemon=True).start()
 
     def _stop(self):
@@ -419,82 +588,24 @@ class App(tk.Tk):
         self.start_btn.config(state="normal")
         self.stop_btn.config(state="disabled")
         self._set_status("לא פעיל", "gray", "⚫")
-        self.title("🚨 התרעות פיקוד העורף → WiZ — V4")
         self.demo_banner.pack_forget()
         self._log("⏹ המעקב הופסק")
-
-    def _test_lamp(self):
-        ip = self.ip_var.get().strip()
-        if not ip:
-            messagebox.showwarning("חסר IP", "נא למלא את ה-IP של הנורה")
-            return
-        self._log("🔦 בודק חיבור לנורה...")
-        def _do():
-            try:
-                run_async(flash_and_set(ip, 255, 0, 0))
-                time.sleep(2)
-                run_async(set_color(ip, NORMAL["r"], NORMAL["g"], NORMAL["b"], NORMAL["brightness"]))
-                self._log("✅ נורה מגיבה בהצלחה!")
-            except Exception as e:
-                self._log(f"❌ שגיאה: {e}")
-        threading.Thread(target=_do, daemon=True).start()
-
-    def _simulate(self, cat):
-        color = ALERT_COLORS.get(cat, {"r": 255, "g": 0, "b": 0, "name": "🔴 התרעה"})
-        ip = self.ip_var.get().strip()
-        if ip:
-            self._log(f"🧪 סימולציה: {color['name']}")
-            self._set_status(f"⚠️ סימולציה: {color['name']}", "orange", "🟠")
-        else:
-            self._log(f"🧪 סימולציה דמו (ללא נורה): {color['name']}")
-            self._set_status(f"⚠️ דמו בלבד — ללא נורה: {color['name']}", "orange", "🟠")
-
-        # הבהוב החלון בכל מקרה
-        hex_color = "#{:02x}{:02x}{:02x}".format(
-            min(color["r"], 200), min(color["g"], 200), min(color["b"], 200))
-        self._flash_window(hex_color)
-
-        if ip:
-            def _do():
-                try:
-                    run_async(flash_and_set(ip, color["r"], color["g"], color["b"]))
-                    time.sleep(5)
-                    run_async(set_color(ip, NORMAL["r"], NORMAL["g"], NORMAL["b"], NORMAL["brightness"]))
-                    self._log("✅ סימולציה הסתיימה")
-                    self._set_status("מאזין להתרעות..." if self.running else "לא פעיל",
-                                     "green" if self.running else "gray",
-                                     "🟢" if self.running else "⚫")
-                except Exception as e:
-                    self._log(f"❌ שגיאה בנורה: {e}")
-            threading.Thread(target=_do, daemon=True).start()
-        else:
-            self._log("💡 מציג בממשק בלבד — אין נורה")
-            self.after(5000, lambda: [
-                self._set_status("מצב דמו — ללא נורה" if self.running else "לא פעיל",
-                                 "orange" if self.running else "gray",
-                                 "🟠" if self.running else "⚫"),
-                self.configure(bg="SystemButtonFace")
-            ])
-
-    def _flash_window(self, color):
-        """הבהוב חלון הממשק בצבע ההתרעה"""
-        def _do():
-            for i in range(6):
-                bg = color if i % 2 == 0 else "SystemButtonFace"
-                self.configure(bg=bg)
-                time.sleep(0.35)
-            self.configure(bg=color)
-        threading.Thread(target=_do, daemon=True).start()
 
     def _monitor_loop(self):
         alert_active = False
         alert_end_time = 0
         last_alert_id = None
         seen_ids = set()
-        ip = self.config_data["wiz_ip"]
+        lt = self.config_data["light_type"]
+        wiz_ip = self.config_data["wiz_ip"]
+        ble_addr = self.config_data["ble_address"]
         city = self.config_data["my_city"]
+
+        # הנורה על עמעום מינימלי בהתחלה
         try:
-            run_async(set_color(ip, NORMAL["r"], NORMAL["g"], NORMAL["b"], NORMAL["brightness"]))
+            if lt == "ble" and ble_addr:
+                run_async(ble_turn_off(ble_addr))
+                self._log("💡 נורה על עמעום מינימלי - מוכנה להתרעות")
         except:
             pass
 
@@ -503,29 +614,25 @@ class App(tk.Tk):
                 resp = requests.get(OREF_URL, headers=OREF_HEADERS, timeout=2)
                 if not resp.text.strip():
                     resp = requests.get(OREF_URL_BACKUP, headers=OREF_HEADERS, timeout=2)
-                alerts = []
+
                 raw = resp.text.strip()
-                
-                # ניקוי BOM
                 if raw.startswith('\ufeff'):
                     raw = raw[1:]
                 raw = raw.strip()
-                
+
+                alerts = []
                 if resp.status_code == 200 and raw and raw not in ['', '[]', '{}']:
-                    # לוג דיבוג
-                    self._log(f"📡 קיבלתי: {raw[:100]}...")
                     try:
                         data = json.loads(raw)
                         if isinstance(data, dict) and "data" in data:
                             alerts = [data]
                         elif isinstance(data, list) and len(data) > 0:
                             alerts = data
-                    except Exception as e:
-                        self._log(f"❌ שגיאת פרסור: {e}")
+                    except:
+                        pass
 
                 show_all = self.all_country_var.get()
 
-                # סינון — ברירת מחדל: עיר. אם "כל הארץ" מסומן: הכל
                 def is_relevant(a):
                     if show_all:
                         return True
@@ -549,69 +656,66 @@ class App(tk.Tk):
                     cat = str(alert.get("cat", ""))
                     cities_str = ", ".join(alert.get("data", []))
 
-                    # התרעה מקדימה
+                    # Skip early warning and end events
                     if cat == "14":
-                        self._log(f"⚠️ התרעה מקדימה — בדקות הקרובות | {cities_str}")
-                        self._set_status("⚠️ התרעה מקדימה", "orange", "🟠")
+                        self._log(f"⚠️ התרעה מקדימה | {cities_str}")
                         continue
-
-                    # התרעת סיום (cat 10 או cat 13 עם "הסתיים")
-                    if cat == "10" or (cat == "13" and "הסתיים" in alert.get("title", "")):
+                    if cat == "10":
                         self._log(f"✅ האירוע הסתיים | {cities_str}")
                         continue
 
                     color = ALERT_COLORS.get(cat, {"r": 255, "g": 50, "b": 0, "name": "🟠 התרעה"})
-                    enabled = (ALERT_COLORS.get(cat, {}).get("default_on", True)
-                               or self.optional_vars.get(cat, tk.BooleanVar(value=False)).get())
-                    if not enabled:
-                        continue
-
                     self._log(f"🚨 {color['name']} | {cities_str}")
 
-                    # פעולות רק אם העיר תואמת (גם במצב כל הארץ — נורה רק לעיר שלי)
+                    # Check city match for light activation
                     city_match = not city.strip() or any(
                         city.strip() == c.strip() or city.strip() in c.strip() or c.strip() in city.strip()
                         for c in alert.get("data", [])
                     )
+
                     if city_match and (not alert_active or alert_id != last_alert_id):
                         self._set_status(f"{color['name']}", "red", "🔴")
                         hex_color = "#{:02x}{:02x}{:02x}".format(
                             min(color["r"], 200), min(color["g"], 200), min(color["b"], 200))
                         self._flash_window(hex_color)
-                        if ip:
-                            try:
-                                run_async(flash_and_set(ip, color["r"], color["g"], color["b"]))
-                            except Exception as e:
-                                self._log(f"❌ נורה: {e}")
+
+                        # Flash light
+                        try:
+                            if lt == "wiz" and wiz_ip:
+                                run_async(wiz_flash_and_set(wiz_ip, color["r"], color["g"], color["b"]))
+                            elif lt == "ble" and ble_addr:
+                                run_async(ble_flash_and_set(ble_addr, color["r"], color["g"], color["b"]))
+                        except Exception as e:
+                            self._log(f"❌ נורה: {e}")
+
                         alert_active = True
                         last_alert_id = alert_id
                         alert_end_time = time.time() + self.config_data["alert_duration_sec"]
 
+                # Return to normal after alert ends
                 if not relevant and alert_active and time.time() > alert_end_time:
-                    self._log("✅ ההתרעה הסתיימה — חזרה לצבע רגיל")
+                    self._log("✅ ההתרעה הסתיימה — נורה על עמעום")
                     self._set_status("מאזין להתרעות...", "green", "🟢")
                     try:
-                        run_async(set_color(ip, NORMAL["r"], NORMAL["g"], NORMAL["b"], NORMAL["brightness"]))
+                        if lt == "ble" and ble_addr:
+                            run_async(ble_turn_off(ble_addr))
                     except:
                         pass
                     alert_active = False
                     last_alert_id = None
 
+                # Clean old IDs
+                if len(seen_ids) > 200:
+                    seen_ids = set(list(seen_ids)[-100:])
+
             except Exception as e:
-                pass  # שגיאות רשת — בשקט
+                pass  # Silent network errors
 
             time.sleep(self.config_data["poll_interval_sec"])
 
     def _on_close(self):
         self.running = False
         self.destroy()
-
-
-def run_async_return(coro):
-    loop = asyncio.new_event_loop()
-    result = loop.run_until_complete(coro)
-    loop.close()
-    return result
 
 
 if __name__ == "__main__":
