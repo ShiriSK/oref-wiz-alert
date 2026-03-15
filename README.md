@@ -2,9 +2,10 @@
 
 מערכת התרעות חזותית לחירשים וכבדי שמיעה
 
+> Developed by **Shiri Schnapp Kashi** | [shiri@designservice.co.il](mailto:shiri@designservice.co.il)
+
 ![OrefWiz Alert GUI](GUI_WIZ_ALERT.png)
 
-> Developed by **Shiri Schnapp Kashi** | [shiri@designservice.co.il](mailto:shiri@designservice.co.il)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
