@@ -172,13 +172,17 @@ async def wiz_set_color(ip, r, g, b, brightness=255):
     await bulb.async_close()
 
 async def wiz_flash_and_set(ip, r, g, b):
+    """הבהוב בסגנון משטרה - צבע ולבן לסירוגין"""
     if not HAS_WIZ:
         return
     bulb = wizlight(ip)
-    for i in range(6):
-        br = 255 if i % 2 == 0 else 20
-        await bulb.turn_on(PilotBuilder(rgb=(r, g, b), brightness=br))
-        await asyncio.sleep(0.35)
+    # הבהוב מהיר בסגנון משטרה - 20 פעמים (10 שניות)
+    for i in range(20):
+        if i % 2 == 0:
+            await bulb.turn_on(PilotBuilder(rgb=(r, g, b), brightness=255))
+        else:
+            await bulb.turn_on(PilotBuilder(rgb=(255, 255, 255), brightness=255))
+        await asyncio.sleep(0.25)
     await bulb.turn_on(PilotBuilder(rgb=(r, g, b), brightness=255))
     await bulb.async_close()
 
@@ -211,14 +215,19 @@ async def ble_turn_off(address):
         await client.write_gatt_char(BLE_CHAR_UUID, cmd, response=False)
 
 async def ble_flash_and_set(address, r, g, b):
+    """הבהוב בסגנון משטרה - צבע ולבן לסירוגין"""
     if not HAS_BLE:
         return
-    for i in range(6):
+    # הבהוב מהיר בסגנון משטרה - 20 פעמים (10 שניות)
+    for i in range(20):
         if i % 2 == 0:
+            # צבע ההתרעה
             await ble_set_color(address, r, g, b)
         else:
-            await ble_set_color(address, 0, 0, 0)
-        await asyncio.sleep(0.35)
+            # לבן
+            await ble_set_color(address, 255, 255, 255)
+        await asyncio.sleep(0.25)  # מהיר - רבע שניה
+    # נשאר על הצבע בסוף
     await ble_set_color(address, r, g, b)
 
 async def discover_ble_devices():
@@ -692,21 +701,23 @@ class App(tk.Tk):
                             min(color["r"], 200), min(color["g"], 200), min(color["b"], 200))
                         self._flash_window(hex_color)
 
-                        # Flash light in separate thread (non-blocking)
-                        def flash_light():
-                            try:
-                                if lt == "wiz" and wiz_ip:
-                                    run_async(wiz_flash_and_set(wiz_ip, color["r"], color["g"], color["b"]))
-                                elif lt == "ble" and ble_addr:
-                                    run_async(ble_flash_and_set(ble_addr, color["r"], color["g"], color["b"]))
-                                self._log("✅ נורה הודלקה!")
-                            except Exception as e:
-                                self._log(f"❌ נורה: {e}")
-                        threading.Thread(target=flash_light, daemon=True).start()
-
+                        # Start continuous police-style flashing in separate thread
                         alert_active = True
                         last_alert_id = alert_id
                         alert_end_time = time.time() + 3600  # שעה - נכבה רק כשיש "האירוע הסתיים"
+                        
+                        def continuous_flash():
+                            while self.running and alert_active and time.time() < alert_end_time:
+                                try:
+                                    if lt == "wiz" and wiz_ip:
+                                        run_async(wiz_flash_and_set(wiz_ip, color["r"], color["g"], color["b"]))
+                                    elif lt == "ble" and ble_addr:
+                                        run_async(ble_flash_and_set(ble_addr, color["r"], color["g"], color["b"]))
+                                except Exception as e:
+                                    self._log(f"❌ נורה: {e}")
+                                    break
+                        threading.Thread(target=continuous_flash, daemon=True).start()
+                        self._log("✅ נורה מהבהבת!")
 
                 # Return to normal after event ended + 2 minutes
                 if alert_active and time.time() > alert_end_time:
@@ -719,6 +730,17 @@ class App(tk.Tk):
                         pass
                     alert_active = False
                     last_alert_id = None
+                    
+                    # כיבוי נוסף אחרי דקה (באג חומרה)
+                    def delayed_turn_off():
+                        time.sleep(60)
+                        if self.running and not alert_active:
+                            try:
+                                run_async(ble_turn_off(ble_addr))
+                            except:
+                                pass
+                    if lt == "ble" and ble_addr:
+                        threading.Thread(target=delayed_turn_off, daemon=True).start()
 
                 # Clean old IDs
                 if len(seen_ids) > 200:
