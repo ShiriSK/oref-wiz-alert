@@ -209,7 +209,7 @@ python oref_wiz_v7.py
 
 ## 📞 יצירת קשר
 
-**שירי שנאפ-כשי**
+**שירי קשי**
 - 📧 shiri@designservice.co.il
 - 📱 054-6678895
 
