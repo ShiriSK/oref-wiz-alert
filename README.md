@@ -1,21 +1,8 @@
-# 🚨 OrefWiz Alert — V3
+# 🚨 OrefWiz - התרעות חזותיות לחירשים
 
-מערכת התרעות חזותית לחירשים וכבדי שמיעה
+מערכת התרעות חזותית המתחברת לפיקוד העורף ומפעילה נורת LED חכמה בזמן אזעקה.
 
-> Developed by **Shiri Schnapp Kashi** | [shiri@designservice.co.il](mailto:shiri@designservice.co.il) | 054-6678895
-
-![OrefWiz Alert GUI](GUI_WIZ_ALERT.png)
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Platform: Windows](https://img.shields.io/badge/platform-Windows-lightgrey.svg)]()
-
----
-
-## 💡 הרעיון
-
-אנשים חירשים וכבדי שמיעה לא שומעים את צופר האזעקה.
-המערכת הזו מתחברת לפיקוד העורף ומפעילה נורה חכמה בצבע מתאים כשיש התרעה.
+**פותח על ידי שירי קשי  ** | [shiri@designservice.co.il](mailto:shiri@designservice.co.il) | 054-6678895
 
 ---
 
@@ -30,14 +17,14 @@
 ## ✨ תכונות
 
 - 🔴 **אדום** - ירי רקטות וטילים
-- 🟢 **ירוק** - חדירת מחבלים
+- 🟢 **ירוק** - חדירת מחבלים  
 - 🟠 **כתום** - חדירת כלי טיס עוין
 - 🔵 **כחול** - תרגיל
+
 - 💡 הבהוב בסגנון משטרה (צבע ↔ לבן)
 - 📍 בחירת עיר ספציפית או כל הארץ
 - 📋 יומן אירועים מפורט
 - 🔧 מצב דמו לבדיקה ללא נורה
-- ⚡ בדיקה כל 0.5 שניות
 
 ---
 
@@ -74,11 +61,11 @@ pip install pywizlight
 ```
 
 ### שלב 3: הורדת האפליקציה
-הורידו את `oref_wiz_gui_v3.py` מהריפו הזה.
+הורידו את `oref_wiz_v7.py` מהריפו הזה.
 
 ### שלב 4: הפעלה
 ```powershell
-python oref_wiz_gui_v3.py
+python oref_wiz_v7.py
 ```
 
 ---
@@ -190,7 +177,7 @@ python oref_wiz_gui_v3.py
 
 ## 📞 יצירת קשר
 
-**שירי שנאפ-כשי**
+**שירי קשי**
 - 📧 shiri@designservice.co.il
 - 📱 054-6678895
 
