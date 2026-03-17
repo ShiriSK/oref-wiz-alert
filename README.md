@@ -2,8 +2,40 @@
 
 מערכת התרעות חזותית המתחברת לפיקוד העורף ומפעילה נורת LED חכמה בזמן אזעקה.
 
-**פותח על ידי שירי קשי  ** | [shiri@designservice.co.il](mailto:shiri@designservice.co.il) | 054-6678895
+# 🚨 OrefWiz Alert — V3
 
+מערכת התרעות חזותית לחירשים וכבדי שמיעה
+
+> Developed by **Shiri Schnapp Kashi** | [shiri@designservice.co.il](mailto:shiri@designservice.co.il)
+
+![OrefWiz Alert GUI](GUI_WIZ_ALERT.png)
+
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Platform: Windows](https://img.shields.io/badge/platform-Windows-lightgrey.svg)]()
+
+---
+
+## 💡 הרעיון
+
+אנשים חירשים וכבדי שמיעה לא שומעים את צופר האזעקה. 
+המערכת הזו מתחברת לפיקוד העורף ומפעילה נורה חכמה (WiZ) בצבע אדום כשיש התרעה.
+
+## ✨ תכונות
+
+- 🔴 הבהוב נורה חכמה בעת התרעה
+- 📍 סינון לפי עיר או "כל הארץ"
+- 🎨 צבעים שונים לסוגי התרעות שונים
+- 📱 תמיכה בטלגרם (בוט)
+- 💻 ממשק גרפי פשוט בעברית
+- ⚡ בדיקה כל 0.5 שניות
+
+## 🚀 התקנה מהירה
+
+### דרישות
+- Python 3.9 ומעלה
+- נורת WiZ חכמה (אופציונלי)
 ---
 
 ## 🎯 למי זה מיועד?
