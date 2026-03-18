@@ -4,7 +4,7 @@
 
 **פותח על ידי שירי קשי** | [shiri@designservice.co.il](mailto:shiri@designservice.co.il) | 054-6678895
 
-![צילום מסך של האפליקציה](screenshot.png)
+![צילום מסך של האפליקציה](GUI_WIZ_ALERT.png)
 
 ---
 
