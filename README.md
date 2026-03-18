@@ -2,7 +2,20 @@
 
 מערכת התרעות חזותית המתחברת לפיקוד העורף ומפעילה נורת LED חכמה בזמן אזעקה.
 
-**פותח על ידי שירי קשי  ** | [shiri@designservice.co.il](mailto:shiri@designservice.co.il) | 054-6678895
+**פותח על ידי שירי קשי** | [shiri@designservice.co.il](mailto:shiri@designservice.co.il) | 054-6678895
+
+![צילום מסך של האפליקציה](screenshot.png)
+
+---
+
+## 🚀 התקנה מהירה (מומלץ!)
+
+**פשוט לחץ פעמיים על:**
+```
+oref_wiz_gui_v3.exe
+```
+
+זהו! 🎉 לא צריך להתקין כלום.
 
 ---
 
@@ -28,6 +41,15 @@
 
 ---
 
+## 💡 למה מנורה?
+
+- קשה לשים לב למכשיר (טלפון/מחשב)
+- מנורה שמחליפה צבעים - **ישר שמים לב אליה!**
+- אפשר לשים אותה בכל מקום בבית
+- יש גם שקעים חכמים עם WiFi שאפשר להפעיל עם כל התרעה
+
+---
+
 ## 🛒 מה צריך לקנות?
 
 ### נורת Bluetooth (מומלץ) - LotusLamp
@@ -40,33 +62,6 @@
 - **מחיר:** כ-80 ש"ח
 - **איפה:** חנויות חשמל
 - **חיבור:** WiFi ביתי
-
----
-
-## 💻 התקנה
-
-### שלב 1: התקנת Python
-1. הורידו Python מ-[python.org](https://www.python.org/downloads/)
-2. **חשוב:** סמנו ✅ "Add Python to PATH" בהתקנה
-
-### שלב 2: התקנת ספריות
-פתחו PowerShell והריצו:
-```powershell
-pip install requests bleak
-```
-
-לנורות WiZ הוסיפו:
-```powershell
-pip install pywizlight
-```
-
-### שלב 3: הורדת האפליקציה
-הורידו את `oref_wiz_v7.py` מהריפו הזה.
-
-### שלב 4: הפעלה
-```powershell
-python oref_wiz_v7.py
-```
 
 ---
 
@@ -160,9 +155,45 @@ python oref_wiz_v7.py
 
 | קובץ | תיאור |
 |------|--------|
-| `oref_wiz_gui_v3.py` | האפליקציה הראשית |
-| `oref_debug.py` | כלי דיבוג לבדיקת API |
+| `oref_wiz_gui_v3.exe` | ⭐ האפליקציה - פשוט לחץ פעמיים! |
+| `oref_wiz_gui_v3.py` | קוד המקור (למתקדמים) |
+| `how_to_create_exe.md` | מדריך ליצירת EXE מ-Python |
 | `README.md` | המסמך הזה |
+
+---
+
+## 🔧 למתקדמים: הרצה עם Python
+
+אם אתה מעדיף להריץ את קוד המקור ישירות:
+
+### שלב 1: התקנת Python
+1. הורידו Python מ-[python.org](https://www.python.org/downloads/)
+2. **חשוב:** סמנו ✅ "Add Python to PATH" בהתקנה
+
+### שלב 2: התקנת ספריות
+פתחו PowerShell והריצו:
+```powershell
+pip install requests bleak
+```
+
+לנורות WiZ הוסיפו:
+```powershell
+pip install pywizlight
+```
+
+### שלב 3: הפעלה
+```powershell
+python oref_wiz_gui_v3.py
+```
+
+### יצירת EXE בעצמך
+ראה את הקובץ: `how_to_create_exe.md`
+
+---
+
+## 📜 היסטוריית הפרויקט
+
+פרויקט זה עבר **35 עדכונים** במהלך הפיתוח!
 
 ---
 
@@ -180,6 +211,13 @@ python oref_wiz_v7.py
 **שירי קשי**
 - 📧 shiri@designservice.co.il
 - 📱 054-6678895
+
+---
+
+## ⚠️ הערה חשובה
+
+המערכת משתמשת בנתונים הפומביים של פיקוד העורף.
+זהו פרויקט עצמאי ואינו מוצר רשמי של פיקוד העורף.
 
 ---
 
