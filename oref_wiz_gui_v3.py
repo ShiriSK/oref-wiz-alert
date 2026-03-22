@@ -59,7 +59,7 @@ ALERT_COLORS = {
     "1":   {"r": 255, "g": 0,   "b": 0,   "name": "🔴 ירי רקטות",          "default_on": True},
     "2":   {"r": 255, "g": 0,   "b": 0,   "name": "🔴 ירי לא מזוהה",       "default_on": True},
     "3":   {"r": 255, "g": 140, "b": 0,   "name": "🟠 חדירת כלי טיס",      "default_on": True},
-    "4":   {"r": 0,   "g": 220, "b": 0,   "name": "🟢 חדירת מחבלים",       "default_on": True},
+    "4":   {"r": 0,   "g": 220, "b": 0,   "name": "🟢 חדירה ",       "default_on": True},
     "13":  {"r": 255, "g": 0,   "b": 0,   "name": "🔴 פיגוע",               "default_on": True},
     "101": {"r": 0,   "g": 200, "b": 255, "name": "🔵 תרגיל",               "default_on": True},
     "5":   {"r": 128, "g": 0,   "b": 255, "name": "🟣 רעידת אדמה",          "default_on": False},
@@ -318,7 +318,7 @@ class App(tk.Tk):
 
         sim_alerts = [
             ("1",   "🔴 רקטות",  "#e74c3c", "white"),
-            ("4",   "🟢 מחבלים", "#2ecc71", "white"),
+            ("4",   "🟢 חדירה", "#2ecc71", "white"),
             ("101", "🔵 תרגיל",  "#3498db", "white"),
         ]
         for i, (cat, name, bg, fg) in enumerate(sim_alerts):
